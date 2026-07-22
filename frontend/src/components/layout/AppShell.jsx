@@ -71,7 +71,7 @@ function NavIcon({ name }) {
 
 export default function AppShell() {
   const worldId = useCurrentWorldId();
-  const [activePersonaId] = useActivePersona();
+  const [activePersonaId, setActivePersonaId] = useActivePersona();
   const [playPending, setPlayPending] = useState(false);
   const [playError, setPlayError] = useState(null);
   const navigate = useNavigate();
@@ -92,6 +92,10 @@ export default function AppShell() {
       navigate(`/worlds/${worldId}/play/${location}`);
     } catch (err) {
       setPlayError(err.message);
+      if (/no persona/i.test(err.message)) {
+        setActivePersonaId(null);
+        navigate('/persona');
+      }
     } finally {
       setPlayPending(false);
     }

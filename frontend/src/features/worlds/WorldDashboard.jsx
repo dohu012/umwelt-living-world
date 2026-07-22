@@ -208,7 +208,7 @@ export default function WorldDashboard() {
   const { data, isLoading, error } = useWorlds();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [activePersonaId] = useActivePersona();
+  const [activePersonaId, setActivePersonaId] = useActivePersona();
   const [name, setName] = useState('');
   const [copyFor, setCopyFor] = useState(null);
   const [copyName, setCopyName] = useState('');
@@ -285,7 +285,10 @@ export default function WorldDashboard() {
               key={worldId}
               worldId={worldId}
               activePersonaId={activePersonaId}
-              onNeedPersona={() => navigate('/persona')}
+              onNeedPersona={() => {
+                setActivePersonaId(null);
+                navigate('/persona');
+              }}
               copyState={{
                 worldId: copyFor,
                 name: copyName,
