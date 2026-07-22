@@ -111,3 +111,52 @@ test('world will can advise an agent without resolving their decision', () => {
     f.close();
   }
 });
+
+test('agent may accept a strong directed suggestion while keeping the final decision autonomous', () => {
+  const f = fixture();
+  try {
+    const decision = f.decisions.create({
+      agentId: 'alice',
+      prompt: '冒险救人还是留在避难所？',
+      options: [
+        { id: 'stay', label: '留在避难所', weight: 0.8 },
+        { id: 'rescue', label: '外出救人', weight: 0.4 },
+      ],
+    });
+    f.decisions.suggest(decision.id, {
+      content: '有人需要你。',
+      optionId: 'rescue',
+      strength: 0.7,
+    });
+    const resolved = f.decisions.resolveAutonomously(decision.id, { receptiveness: 0.8 });
+    assert.equal(resolved.chosenOptionId, 'rescue');
+    assert.equal(resolved.adviceOutcome, 'accepted');
+    assert.match(resolved.resolutionReason, /selected rescue/);
+  } finally {
+    f.close();
+  }
+});
+
+test('agent rejects advice that cannot outweigh their own preference', () => {
+  const f = fixture();
+  try {
+    const decision = f.decisions.create({
+      agentId: 'alice',
+      prompt: '是否打开危险舱门？',
+      options: [
+        { id: 'closed', label: '保持关闭', weight: 0.9 },
+        { id: 'open', label: '打开舱门', weight: 0.2 },
+      ],
+    });
+    f.decisions.suggest(decision.id, {
+      content: '打开它。',
+      optionId: 'open',
+      strength: 0.2,
+    });
+    const resolved = f.decisions.resolveAutonomously(decision.id, { receptiveness: 0.2 });
+    assert.equal(resolved.chosenOptionId, 'closed');
+    assert.equal(resolved.adviceOutcome, 'rejected');
+  } finally {
+    f.close();
+  }
+});

@@ -112,14 +112,69 @@ export class LifeSimulator {
     return Object.fromEntries(Object.entries(next).map(([key, value]) => [key, clamp(value)]));
   }
 
-  _runAgent(agentId, at, elapsedHours) {
+  _materializeDecision(agentId, action, at) {
+    if (!action.decision) return action;
+    const spec = action.decision;
+    const sourceKey = `${agentId}:${at.slice(0, 10)}:${spec.id ?? at.slice(11, 13)}`;
+    const dueAt = new Date(new Date(at).getTime() + Math.max(1, Number(spec.dueMinutes ?? 60)) * 60 * 1000);
+    const decision = this.decisions.createUnique({
+      sourceKey,
+      agentId,
+      prompt: spec.prompt,
+      options: spec.options,
+      context: { ...(spec.context ?? {}), location: action.location, source: 'life_schedule' },
+      dueAt,
+    });
+    return {
+      type: 'deliberate',
+      location: action.location,
+      reason: action.reason,
+      decisionId: decision.id,
+      decisionStatus: decision.status,
+    };
+  }
+
+  _resolveDueDecisions(at) {
+    const chosenActions = new Map();
+    for (const pending of this.decisions.listDue(at)) {
+      const receptiveness = this._configFor(pending.agentId).worldWill?.receptiveness ?? 0.5;
+      const resolved = this.decisions.resolveAutonomously(pending.id, { receptiveness, resolvedAt: at });
+      const option = resolved.options.find((item) => item.id === resolved.chosenOptionId);
+      const location = option?.location ?? resolved.context?.location ?? this._locationOf(resolved.agentId);
+      chosenActions.set(resolved.agentId, {
+        type: option?.action ?? 'idle',
+        location,
+        targetId: option?.targetId ?? null,
+        reason: `decision:${resolved.id}`,
+        decisionId: resolved.id,
+      });
+      this.store.append({
+        type: 'decision_resolved',
+        actor: resolved.agentId,
+        subject: resolved.agentId,
+        key: String(resolved.id),
+        content: option?.label ?? resolved.chosenOptionId,
+        data: {
+          decisionId: resolved.id,
+          prompt: resolved.prompt,
+          chosenOption: option,
+          adviceOutcome: resolved.adviceOutcome,
+          resolutionReason: resolved.resolutionReason,
+        },
+        ts: at,
+      }, [`private:${resolved.agentId}`, 'system:world-will']);
+    }
+    return chosenActions;
+  }
+
+  _runAgent(agentId, at, elapsedHours, forcedAction = null) {
     this._ensureAgent(agentId, at);
     const state = this.getAgent(agentId);
     const currentLocation = this._locationOf(agentId);
     const weather = this.environment.get('world', 'weather.current')?.value ?? 'clear';
     const decayed = this._decay(state.needs, elapsedHours, state.currentAction);
     const config = this._configFor(agentId);
-    const action = this.planner.choose({
+    let action = forcedAction ?? this.planner.choose({
       needs: decayed,
       schedule: config.schedule ?? [],
       worldTime: at,
@@ -128,6 +183,7 @@ export class LifeSimulator {
       shelterLocation: config.shelterLocation ?? this.locationRegistry.getStartId(),
       companions: this._companions(agentId, currentLocation),
     });
+    action = this._materializeDecision(agentId, action, at);
     const location = this.locationRegistry.get(action.location) ? action.location : currentLocation;
     if (location && location !== currentLocation) {
       this.store.append({ type: 'state', actor: agentId, subject: agentId, key: 'location', content: location, ts: at }, [
@@ -173,8 +229,9 @@ export class LifeSimulator {
     for (let index = 1; index <= steps; index += 1) {
       const at = new Date(baseTime + index * interval).toISOString();
       const elapsedHours = (index === 1 ? skippedSteps + 1 : 1) * interval / HOUR;
+      const chosenActions = this._resolveDueDecisions(at);
       for (const agentId of this.agentRegistry.listAgentIds()) {
-        actions.push(this._runAgent(agentId, at, elapsedHours));
+        actions.push(this._runAgent(agentId, at, elapsedHours, chosenActions.get(agentId) ?? null));
       }
     }
     if (totalSteps > 0) this._setLastTick(target.toISOString());

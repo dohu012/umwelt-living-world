@@ -63,7 +63,12 @@ export function simulationRouter(worldRegistry) {
 
   router.get('/decisions', (req, res) => {
     const current = world(req, res);
-    if (current) res.json({ decisions: current.decisions.listOpen() });
+    if (!current) return;
+    const status = req.query.status ?? 'open';
+    const decisions = status === 'open'
+      ? current.decisions.listOpen()
+      : current.decisions.list({ status: status === 'all' ? null : status });
+    res.json({ decisions });
   });
 
   router.post('/decisions', (req, res) => {

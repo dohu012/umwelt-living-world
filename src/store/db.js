@@ -18,6 +18,20 @@ export function openDb(dbPath) {
   if (!suggestionColumns.some((column) => column.name === 'option_id')) {
     db.exec('ALTER TABLE world_will_suggestions ADD COLUMN option_id TEXT');
   }
+  const decisionColumns = db.prepare('PRAGMA table_info(decision_points)').all();
+  for (const [name, declaration] of [
+    ['source_key', 'TEXT'],
+    ['resolution_reason', 'TEXT'],
+    ['advice_outcome', 'TEXT'],
+  ]) {
+    if (!decisionColumns.some((column) => column.name === name)) {
+      db.exec(`ALTER TABLE decision_points ADD COLUMN ${name} ${declaration}`);
+    }
+  }
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_decision_points_source_key
+    ON decision_points(source_key) WHERE source_key IS NOT NULL
+  `);
 
   // Seeds the atomic seq counter above the current max for pre-existing databases
   // (fresh databases start at 0, matching the old MAX(seq)+1-from-empty behavior).

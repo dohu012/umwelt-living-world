@@ -18,6 +18,14 @@ export class AgentPlanner {
     }
     const scheduled = scheduleForHour(schedule, new Date(worldTime).getUTCHours());
     if (scheduled) {
+      if (scheduled.decision) {
+        return {
+          type: 'deliberate',
+          location: scheduled.location ?? currentLocation,
+          reason: 'important decision',
+          decision: scheduled.decision,
+        };
+      }
       return {
         type: scheduled.action ?? 'work',
         location: scheduled.location ?? currentLocation,

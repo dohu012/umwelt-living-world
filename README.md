@@ -29,6 +29,8 @@ The first living-world slice adds:
 - a SQLite-backed scheduled job queue that survives process restarts;
 - staged world-will events (`forecast` → `impact` → `aftermath`);
 - persistent agent decision points and non-binding world-will suggestions;
+- time-limited important choices that agents resolve from personal preference and advice strength;
+- explicit advice outcomes (`accepted`, `rejected`, `no_advice`, or `general_advice`);
 - autonomous agent needs, schedules, movement, work, rest, eating, socializing, and sheltering;
 - persistent environment state changed by staged weather events;
 - a background worker that ticks every world even when no player is connected;
@@ -78,6 +80,10 @@ POST /api/worlds/纠缠号/simulation/decisions
 POST /api/worlds/纠缠号/simulation/decisions/:decisionId/suggestions
 POST /api/worlds/纠缠号/simulation/tick
 ```
+
+Use `?status=open`, `?status=resolved`, or `?status=all` when reading decisions. A directed
+suggestion can include `optionId`; it increases that option's score according to the agent's
+configured world-will receptiveness, but the agent can still reject it.
 
 Schedule a typhoon-like event:
 

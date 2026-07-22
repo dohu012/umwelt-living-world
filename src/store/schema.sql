@@ -92,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_world_events_schedule
 
 CREATE TABLE IF NOT EXISTS decision_points (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_key TEXT,
   agent_id TEXT NOT NULL,
   prompt TEXT NOT NULL,
   options TEXT NOT NULL,
@@ -99,6 +100,8 @@ CREATE TABLE IF NOT EXISTS decision_points (
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'expired')),
   due_at TEXT,
   chosen_option_id TEXT,
+  resolution_reason TEXT,
+  advice_outcome TEXT,
   created_at TEXT NOT NULL,
   resolved_at TEXT
 );
