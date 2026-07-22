@@ -1,4 +1,7 @@
-export const IMAGE_EXTENSIONS = ['webp', 'png', 'jpg', 'jpeg'];
+// Every bundled template and the portrait/background generators currently emit PNG. Probe that
+// canonical format first so a successful render does not create a noisy, guaranteed WebP 404 in
+// DevTools before falling back to the file that is actually present.
+export const IMAGE_EXTENSIONS = ['png', 'webp', 'jpg', 'jpeg'];
 
 const EMOTION_ALIASES = [
   ['happy', ['开心', '高兴', '愉快', '轻松', '满意', '兴奋', 'happy', 'joy', 'smile']],
