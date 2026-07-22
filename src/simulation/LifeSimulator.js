@@ -207,7 +207,7 @@ export class LifeSimulator {
         ts: at,
       }, [`private:${agentId}`, location ? `local:${location}` : 'global']);
     }
-    return { agentId, action: { ...action, location }, needs };
+    return { agentId, at, action: { ...action, location }, needs };
   }
 
   advanceTo(worldTime, { maxSteps = 24 } = {}) {

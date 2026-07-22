@@ -7,6 +7,48 @@ import { readStateSnapshot, summarizeState } from '../../agents/state/stateSnaps
 
 const BACKGROUND_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 
+function parseJson(value) {
+  if (!value) return null;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+export function buildReturnBriefing(world, personaId) {
+  const marker = world.db.prepare('SELECT value FROM simulation_state WHERE key = ?')
+    .pluck().get(`persona.last_departure:${personaId}`);
+  const departure = parseJson(marker);
+  if (departure?.seq == null) return null;
+  const relevantTypes = new Set(['life_action', 'decision_resolved', 'world_event', 'dialogue', 'narration', 'autonomous_scene']);
+  const events = world.store.getEventsWithTags()
+    .filter((event) => event.seq > departure.seq && relevantTypes.has(event.type))
+    .map((event) => ({ ...event, data: parseJson(event.data) }))
+    .filter((event) => !['dialogue', 'narration'].includes(event.type) || event.data?.autonomous === true)
+    .slice(-40)
+    .map((event) => {
+      let actorName = event.actor;
+      try { actorName = world.agentRegistry.loadProfile(event.actor)?.name ?? event.actor; } catch { /* system actor */ }
+      const locationId = event.data?.location ?? event.tags?.find((tag) => tag.startsWith('local:'))?.slice(6) ?? null;
+      return {
+        id: event.id,
+        seq: event.seq,
+        ts: event.ts,
+        type: event.type,
+        actor: event.actor,
+        actorName,
+        content: event.content,
+        data: event.data,
+        locationId,
+        locationName: locationId ? world.locationRegistry.get(locationId)?.name ?? locationId : null,
+      };
+    });
+  if (events.length === 0) return null;
+  return {
+    from: departure.worldTime,
+    to: world.clock.getState().worldTime,
+    eventCount: events.length,
+    events,
+  };
+}
+
 function uniqueWorldId(worldRegistry, name) {
   const base = slugify(name, { fallback: 'world' });
   let candidate = base;
@@ -110,9 +152,10 @@ export function worldsRouter(worldRegistry, { personaStore } = {}) {
     if (!personaStore?.get(personaId)) {
       return res.status(404).json({ error: `no persona "${personaId}"` });
     }
-    const { store, locationRegistry } = worldRegistry.getWorld(worldId);
+    const current = worldRegistry.getWorld(worldId);
+    const { store, locationRegistry } = current;
     const location = resolvePersonaLocation({ store, personaId, locationRegistry });
-    res.json({ location });
+    res.json({ location, briefing: buildReturnBriefing(current, personaId) });
   });
 
   router.post('/:worldId/personas/:personaId/location', (req, res) => {

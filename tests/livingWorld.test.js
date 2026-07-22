@@ -160,3 +160,30 @@ test('agent rejects advice that cannot outweigh their own preference', () => {
     f.close();
   }
 });
+
+test('an AI-planned world event executes its authored timeline and environment effects', async () => {
+  const f = fixture();
+  try {
+    const planned = f.events.schedulePlan({
+      title: '舰桥断电',
+      kind: 'blackout',
+      scope: 'bridge',
+      intensity: 0.7,
+      instruction: '两小时后舰桥断电，三小时后恢复。',
+      rationale: '分为故障与恢复两个节点。',
+      timeline: [
+        { at: '2026-07-22T02:00:00.000Z', phase: 'outage', description: '主照明熄灭，应急灯亮起。', effects: [{ scope: 'bridge', key: 'infrastructure.power', value: 'offline' }] },
+        { at: '2026-07-22T03:00:00.000Z', phase: 'recovery', description: '维修完成，照明逐段恢复。', effects: [{ scope: 'bridge', key: 'infrastructure.power', value: 'online' }] },
+      ],
+    });
+    assert.equal(planned.plan.timeline.length, 2);
+    f.clock.advanceBy(2 * 60 * 60 * 1000);
+    await f.engine.tick();
+    assert.equal(f.environment.get('bridge', 'infrastructure.power').value, 'offline');
+    f.clock.advanceBy(60 * 60 * 1000);
+    await f.engine.tick();
+    assert.equal(f.environment.get('bridge', 'infrastructure.power').value, 'online');
+    assert.equal(f.events.get(planned.event.id).status, 'completed');
+    assert.equal(f.store.getRecentEvents().filter((event) => event.actor === 'world-will-agent').length, 2);
+  } finally { f.close(); }
+});

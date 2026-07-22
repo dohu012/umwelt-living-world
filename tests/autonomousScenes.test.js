@@ -22,14 +22,70 @@ test('co-located active agents schedule one cooldown-bounded autonomous scene', 
   const f = fixture();
   try {
     const scheduler = new AutonomousSceneScheduler({ db: f.db, queue: f.queue, cooldownHours: 6 });
-    const life = { actions: [
-      { agentId: 'alice', action: { type: 'work', location: 'bridge' } },
-      { agentId: 'bob', action: { type: 'socialize', location: 'bridge' } },
-    ] };
-    assert.equal(scheduler.scheduleFromLife(life, '2026-07-22T01:00:00.000Z').length, 1);
-    assert.equal(scheduler.scheduleFromLife(life, '2026-07-22T02:00:00.000Z').length, 0);
-    assert.equal(scheduler.scheduleFromLife(life, '2026-07-22T07:00:00.000Z').length, 1);
+    const lifeAt = (at) => ({ actions: [
+      { agentId: 'alice', at, action: { type: 'work', location: 'bridge' } },
+      { agentId: 'bob', at, action: { type: 'socialize', location: 'bridge' } },
+    ] });
+    assert.equal(scheduler.scheduleFromLife(lifeAt('2026-07-22T01:00:00.000Z'), '2026-07-22T01:00:00.000Z').length, 1);
+    assert.equal(scheduler.scheduleFromLife(lifeAt('2026-07-22T02:00:00.000Z'), '2026-07-22T02:00:00.000Z').length, 0);
+    assert.equal(scheduler.scheduleFromLife(lifeAt('2026-07-22T07:00:00.000Z'), '2026-07-22T07:00:00.000Z').length, 1);
     assert.equal(f.queue.listDue('2026-07-22T07:00:00.000Z').length, 2);
+  } finally { f.close(); }
+});
+
+test('world engine executes a newly scheduled autonomous scene in the same synchronization', async () => {
+  const queue = [];
+  const fakeQueue = {
+    listDue: () => queue.filter((job) => job.status === 'pending'),
+    markRunning: (id) => { const job = queue.find((item) => item.id === id); job.status = 'running'; return true; },
+    complete: (id) => { queue.find((item) => item.id === id).status = 'completed'; },
+    fail: () => {},
+  };
+  const { WorldEngine } = await import('../src/simulation/WorldEngine.js');
+  const calls = [];
+  const engine = new WorldEngine({
+    clock: { synchronize: () => ({ worldTime: '2026-07-22T02:00:00.000Z' }) },
+    queue: fakeQueue,
+    worldEvents: {},
+    lifeSimulator: { advanceTo: () => ({ actions: [{ agentId: 'alice' }] }) },
+    sceneScheduler: { scheduleFromLife: () => {
+      queue.push({ id: 1, type: 'autonomous_scene', status: 'pending', payload: { location: 'bridge' } });
+      return [queue[0]];
+    } },
+    autonomousScenes: { run: async (payload) => { calls.push(payload); return { status: 'completed' }; } },
+  });
+  const result = await engine.tick();
+  assert.equal(result.scheduledScenes, 1);
+  assert.equal(result.processed, 1);
+  assert.equal(calls.length, 1);
+});
+
+test('a meaningful earlier catch-up step is not hidden by a later idle step', () => {
+  const f = fixture();
+  try {
+    const scheduler = new AutonomousSceneScheduler({ db: f.db, queue: f.queue });
+    const actions = [
+      { agentId: 'alice', at: '2026-07-22T01:00:00.000Z', action: { type: 'work', location: 'bridge' } },
+      { agentId: 'bob', at: '2026-07-22T01:00:00.000Z', action: { type: 'work', location: 'bridge' } },
+      { agentId: 'alice', at: '2026-07-22T02:00:00.000Z', action: { type: 'idle', location: 'bridge' } },
+      { agentId: 'bob', at: '2026-07-22T02:00:00.000Z', action: { type: 'idle', location: 'bridge' } },
+    ];
+    const [job] = scheduler.scheduleFromLife({ actions }, '2026-07-22T02:00:00.000Z');
+    assert.equal(job.payload.triggeredAt, '2026-07-22T01:00:00.000Z');
+  } finally { f.close(); }
+});
+
+test('two awake idle agents may naturally talk, while sleeping agents do not join', () => {
+  const f = fixture();
+  try {
+    const scheduler = new AutonomousSceneScheduler({ db: f.db, queue: f.queue });
+    const actions = [
+      { agentId: 'alice', at: '2026-07-22T01:00:00.000Z', action: { type: 'idle', location: 'bridge' } },
+      { agentId: 'bob', at: '2026-07-22T01:00:00.000Z', action: { type: 'idle', location: 'bridge' } },
+      { agentId: 'carol', at: '2026-07-22T01:00:00.000Z', action: { type: 'sleep', location: 'bridge' } },
+    ];
+    const [job] = scheduler.scheduleFromLife({ actions }, '2026-07-22T01:00:00.000Z');
+    assert.deepEqual(job.payload.participants.map((item) => item.agentId), ['alice', 'bob']);
   } finally { f.close(); }
 });
 

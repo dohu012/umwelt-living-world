@@ -4623,6 +4623,73 @@ form.form .form-row {
   accent-color: var(--accent);
 }
 
+.world-event-form textarea {
+  min-height: 150px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.world-event-form > small,
+.will-plan-result p,
+.will-plan-result li {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.will-plan-result {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(115, 174, 230, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(80, 145, 205, 0.08);
+}
+
+.will-plan-result ol {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.2rem;
+}
+
+.return-briefing-card {
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 40px));
+}
+
+.return-briefing-range {
+  color: var(--text-muted);
+}
+
+.return-briefing-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.return-briefing-list article {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.return-briefing-list article > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.return-briefing-list time,
+.return-briefing-list small {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
 .environment-list,
 .scheduled-event-list {
   display: grid;

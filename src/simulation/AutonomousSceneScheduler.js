@@ -25,24 +25,25 @@ export class AutonomousSceneScheduler {
 
   scheduleFromLife(life, worldTime) {
     if (!life?.actions?.length) return [];
-    const at = new Date(worldTime).toISOString();
-    const latestByAgent = new Map();
-    for (const item of life.actions) latestByAgent.set(item.agentId, item);
-
-    const byLocation = new Map();
-    for (const item of latestByAgent.values()) {
+    const fallbackAt = new Date(worldTime).toISOString();
+    const byMomentAndLocation = new Map();
+    for (const item of life.actions) {
       const location = item.action?.location;
       if (!location) continue;
-      if (!byLocation.has(location)) byLocation.set(location, []);
-      byLocation.get(location).push(item);
+      const at = item.at ?? fallbackAt;
+      const key = `${at}\u0000${location}`;
+      if (!byMomentAndLocation.has(key)) byMomentAndLocation.set(key, { at, location, present: [] });
+      byMomentAndLocation.get(key).present.push(item);
     }
 
     const jobs = [];
-    for (const [location, present] of byLocation) {
-      if (present.length < 2 || present.every((item) => item.action?.type === 'idle')) continue;
+    for (const { at, location, present } of byMomentAndLocation.values()) {
+      // Quiet shared time is a valid social scene; only sleeping characters are unavailable.
+      const available = present.filter((item) => item.action?.type !== 'sleep');
+      if (available.length < 2) continue;
       const last = this._lastScheduled(location);
       if (last && new Date(at).getTime() - new Date(last).getTime() < this.cooldownMs) continue;
-      const participants = present
+      const participants = available
         .sort((a, b) => a.agentId.localeCompare(b.agentId))
         .slice(0, this.maxParticipants)
         .map((item) => ({ agentId: item.agentId, action: item.action?.type ?? 'idle' }));

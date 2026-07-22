@@ -74,6 +74,7 @@ export class RoomManager {
   _makeResolveName(agentRegistry) {
     return (id) => {
       if (id === 'narrator') return '旁白';
+      if (id === 'world-will' || id === 'world-will-agent') return '世界意志';
       const persona = this.personaStore.get(id);
       if (persona) return persona.name;
       try {
@@ -91,16 +92,27 @@ export class RoomManager {
     ws.umweltRoom = { worldId, location, personaId };
   }
 
-  leave(ws) {
+  leave(ws, { recordDeparture = true } = {}) {
     if (!ws.umweltRoom) return;
-    const { worldId, location } = ws.umweltRoom;
+    const { worldId, location, personaId } = ws.umweltRoom;
     this._rooms.get(this._roomKey(worldId, location))?.delete(ws);
+    if (recordDeparture && personaId && this.worldRegistry.worldExists(worldId)) {
+      const { db, clock } = this.worldRegistry.getWorld(worldId);
+      const seq = db.prepare('SELECT COALESCE(MAX(seq), 0) FROM events').pluck().get();
+      const value = JSON.stringify({ seq, worldTime: clock.getState().worldTime });
+      const updatedAt = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO simulation_state (key, value, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).run(`persona.last_departure:${personaId}`, value, updatedAt);
+    }
+    ws.umweltRoom = null;
   }
 
   /** Moves an already-joined socket to a different room within the same world (e.g. the player's own location changed mid-session). */
   moveSocket(ws, newLocation) {
     const { worldId, personaId } = ws.umweltRoom;
-    this.leave(ws);
+    this.leave(ws, { recordDeparture: false });
     this.join(ws, { worldId, location: newLocation, personaId });
   }
 

@@ -16,6 +16,7 @@ import { EnvironmentStore } from '../simulation/EnvironmentStore.js';
 import { LifeSimulator } from '../simulation/LifeSimulator.js';
 import { AutonomousSceneScheduler } from '../simulation/AutonomousSceneScheduler.js';
 import { AutonomousSceneRunner } from '../simulation/AutonomousSceneRunner.js';
+import { WorldWillAgent } from '../simulation/WorldWillAgent.js';
 
 /**
  * Lazily opens and caches one { db, store, agentRegistry, locationRegistry } bundle per world
@@ -79,6 +80,12 @@ export class WorldRegistry {
     const autonomousScenes = new AutonomousSceneRunner({
       store, agentRegistry, locationRegistry, worldDir, providerSettingsStore: this.providerSettingsStore,
     });
+    const worldWillAgent = new WorldWillAgent({
+      providerSettingsStore: this.providerSettingsStore,
+      worldEvents,
+      agentRegistry,
+      locationRegistry,
+    });
     const engine = new WorldEngine({ clock, queue, worldEvents, lifeSimulator, autonomousScenes, sceneScheduler });
     const world = {
       worldId,
@@ -95,6 +102,7 @@ export class WorldRegistry {
       lifeSimulator,
       sceneScheduler,
       autonomousScenes,
+      worldWillAgent,
       worldEvents,
       engine,
     };

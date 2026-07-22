@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client.js';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -17,6 +17,7 @@ import SceneStatusPanel from './SceneStatusPanel.jsx';
 import SkillRunPanel from './SkillRunPanel.jsx';
 import GraphPlaceholder from '../graph/GraphPlaceholder.jsx';
 import WorldIntroOverlay from './WorldIntroOverlay.jsx';
+import ReturnBriefingOverlay from './ReturnBriefingOverlay.jsx';
 import { buildIdNameMap, historyToMessages } from './playUtils.js';
 
 const PLAY_VIEW_MODE_KEY = 'umwelt.playViewMode';
@@ -30,6 +31,8 @@ export default function PlayShell() {
   const [viewMode, setViewMode] = useState(() => localStorage.getItem(PLAY_VIEW_MODE_KEY) || 'immersive');
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
   const navigate = useNavigate();
+  const routeLocation = useLocation();
+  const [returnBriefing, setReturnBriefing] = useState(() => routeLocation.state?.briefing ?? null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -37,6 +40,15 @@ export default function PlayShell() {
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    if (routeLocation.state?.briefing) setReturnBriefing(routeLocation.state.briefing);
+  }, [routeLocation.key, routeLocation.state]);
+
+  const dismissReturnBriefing = () => {
+    setReturnBriefing(null);
+    navigate(routeLocation.pathname, { replace: true, state: null });
+  };
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
@@ -258,7 +270,8 @@ export default function PlayShell() {
   if (viewMode === 'immersive') {
     return (
       <div className="play-shell immersive-shell">
-        {showIntroOverlay && <WorldIntroOverlay intro={introOverlayData} onDismiss={closeIntroOverlay} />}
+        {returnBriefing && <ReturnBriefingOverlay briefing={returnBriefing} onDismiss={dismissReturnBriefing} />}
+        {!returnBriefing && showIntroOverlay && <WorldIntroOverlay intro={introOverlayData} onDismiss={closeIntroOverlay} />}
         {(state.error || historyQuery.isError) && <div className="immersive-banners">{systemBanners}</div>}
         <ImmersivePlayMode
           worldId={worldId}
@@ -281,7 +294,8 @@ export default function PlayShell() {
 
   return (
     <div className={`play-shell mobile-tab-${mobileTab}`}>
-      {showIntroOverlay && <WorldIntroOverlay intro={introOverlayData} onDismiss={closeIntroOverlay} />}
+      {returnBriefing && <ReturnBriefingOverlay briefing={returnBriefing} onDismiss={dismissReturnBriefing} />}
+      {!returnBriefing && showIntroOverlay && <WorldIntroOverlay intro={introOverlayData} onDismiss={closeIntroOverlay} />}
       <PageHeader
         title={currentLocation?.name ?? location}
         subtitle="场景游玩工作台：集中呈现本地对话、场景状态、在场角色和技能流水线。"

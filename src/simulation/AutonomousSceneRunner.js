@@ -67,7 +67,11 @@ export class AutonomousSceneRunner {
       const result = await this.turnRunner.runTurn(agentId, {
         llmClient,
         utilityLlmClient,
-        resolveName: (id) => id === 'system' ? '世界' : this._name(id),
+        resolveName: (id) => {
+          if (id === 'system') return '世界';
+          if (id === 'world-will' || id === 'world-will-agent') return '世界意志';
+          return this._name(id);
+        },
         roster: names.filter((name) => name !== this._name(agentId)),
         witnessIds: agentIds,
         extraTags: ['system:autonomous'],

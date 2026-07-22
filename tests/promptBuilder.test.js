@@ -135,3 +135,20 @@ describe('buildPrompt location grounding + silence, sanity (regression guard)', 
     assert.ok(system.includes(SILENT_MARKER));
   });
 });
+
+test('world-will events enter agent context so characters can react to executed changes', () => {
+  const { messages } = buildPrompt({
+    profile,
+    agentId: 'alice',
+    recentEvents: [{
+      id: 1,
+      actor: 'world-will-agent',
+      type: 'world_event',
+      content: '舰桥主照明熄灭，应急灯亮起。',
+      tags: ['global', 'system:world-event'],
+    }],
+    resolveName: (id) => id === 'world-will-agent' ? '世界意志' : id,
+  });
+  assert.match(messages[0].content, /世界意志/);
+  assert.match(messages[0].content, /应急灯亮起/);
+});

@@ -88,8 +88,8 @@ export default function AppShell() {
     setPlayPending(true);
     setPlayError(null);
     try {
-      const { location } = await api.post(`/api/worlds/${worldId}/personas/${activePersonaId}/enter`, {});
-      navigate(`/worlds/${worldId}/play/${location}`);
+      const { location, briefing } = await api.post(`/api/worlds/${worldId}/personas/${activePersonaId}/enter`, {});
+      navigate(`/worlds/${worldId}/play/${encodeURIComponent(location)}`, { state: { briefing } });
     } catch (err) {
       setPlayError(err.message);
       if (/no persona/i.test(err.message)) {

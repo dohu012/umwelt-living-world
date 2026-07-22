@@ -104,7 +104,7 @@ function WorldCard({
   });
   const enterMutation = useMutation({
     mutationFn: () => api.post(`/api/worlds/${worldId}/personas/${activePersonaId}/enter`, {}),
-    onSuccess: ({ location }) => navigate(`/worlds/${worldId}/play/${encodeURIComponent(location)}`),
+    onSuccess: ({ location, briefing }) => navigate(`/worlds/${worldId}/play/${encodeURIComponent(location)}`, { state: { briefing } }),
     onError: (err) => setPlayError(err.message),
   });
 

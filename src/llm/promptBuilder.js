@@ -91,7 +91,7 @@ export function buildPrompt(context) {
   let lastLocationId = null;
   let sceneMarkersUsed = false;
   for (const ev of recentEvents) {
-    if (ev.type !== 'dialogue' && ev.type !== 'action' && ev.type !== 'system' && ev.type !== 'narration') continue;
+    if (ev.type !== 'dialogue' && ev.type !== 'action' && ev.type !== 'system' && ev.type !== 'narration' && ev.type !== 'world_event') continue;
     if (!ev.content) continue;
 
     const evLocationId = extractLocationId(ev.tags);

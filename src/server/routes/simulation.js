@@ -82,6 +82,23 @@ export function simulationRouter(worldRegistry) {
     }
   });
 
+  router.post('/world-will', async (req, res, next) => {
+    const current = world(req, res);
+    if (!current) return;
+    try {
+      const result = await current.worldWillAgent.planAndSchedule({
+        instruction: req.body?.instruction,
+        worldTime: current.clock.getState().worldTime,
+      });
+      res.status(201).json(result);
+    } catch (error) {
+      if (/请描述|需要一个|计划|时间无效|缺少/.test(error.message)) {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  });
+
   router.get('/decisions', (req, res) => {
     const current = world(req, res);
     if (!current) return;

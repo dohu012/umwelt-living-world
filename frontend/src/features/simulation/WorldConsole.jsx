@@ -30,30 +30,12 @@ const ACTION_LABELS = {
   report: '报告',
 };
 
-const EVENT_PRESETS = {
-  typhoon: { title: '台风登陆', effects: ['heavy_rain', 'power_outage_risk', 'road_closure'] },
-  storm: { title: '强风暴来袭', effects: ['heavy_rain', 'power_outage_risk'] },
-  blackout: { title: '大范围停电', effects: ['power_outage'] },
-  arrival: { title: '陌生访客抵达', effects: ['new_arrival'] },
-  accident: { title: '突发事故', effects: ['danger'] },
-};
-
 function formatWorldTime(value) {
   if (!value) return '未知时间';
   return new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false, timeZone: 'UTC',
   }).format(new Date(value));
-}
-
-function worldInputValue(value, plusHours = 0) {
-  const date = new Date(value ?? Date.now());
-  date.setUTCHours(date.getUTCHours() + plusHours);
-  return date.toISOString().slice(0, 16);
-}
-
-function toWorldIso(value) {
-  return new Date(`${value}:00.000Z`).toISOString();
 }
 
 function NeedMeter({ name, value }) {
@@ -162,7 +144,8 @@ export default function WorldConsole() {
   const decisionsQuery = useQuery({ queryKey: [...queryRoot, 'decisions'], queryFn: () => api.get(`/api/worlds/${worldId}/simulation/decisions?status=open`), ...queryOptions });
   const historyQuery = useQuery({ queryKey: [...queryRoot, 'history'], queryFn: () => api.get(`/api/worlds/${worldId}/simulation/history?limit=80`), ...queryOptions });
   const providersQuery = useQuery({ queryKey: ['providers', 'world-console'], queryFn: () => api.get('/api/settings/providers') });
-  const [eventForm, setEventForm] = useState({ kind: 'typhoon', title: '台风登陆', scheduledAt: '', intensity: 0.8, scope: 'world' });
+  const [willInstruction, setWillInstruction] = useState('');
+  const [willResult, setWillResult] = useState(null);
 
   const controlMutation = useMutation({
     mutationFn: async (body) => {
@@ -173,8 +156,8 @@ export default function WorldConsole() {
   });
   const tickMutation = useMutation({ mutationFn: () => api.post(`/api/worlds/${worldId}/simulation/tick`, {}), onSuccess: refresh });
   const eventMutation = useMutation({
-    mutationFn: (body) => api.post(`/api/worlds/${worldId}/simulation/events`, body),
-    onSuccess: () => { refresh(); setEventForm((current) => ({ ...current, scheduledAt: '' })); },
+    mutationFn: (instruction) => api.post(`/api/worlds/${worldId}/simulation/world-will`, { instruction }),
+    onSuccess: (result) => { refresh(); setWillResult(result); setWillInstruction(''); },
   });
   const suggestionMutation = useMutation({
     mutationFn: ({ id, body }) => api.post(`/api/worlds/${worldId}/simulation/decisions/${id}/suggestions`, body),
@@ -184,21 +167,12 @@ export default function WorldConsole() {
   const errors = [clockQuery.error, agentsQuery.error, environmentQuery.error, eventsQuery.error, decisionsQuery.error, historyQuery.error, providersQuery.error]
     .filter(Boolean);
   const clock = clockQuery.data;
-  const eventDate = eventForm.scheduledAt || worldInputValue(clock?.worldTime, 24);
   const environment = environmentQuery.data?.environment ?? [];
   const weather = useMemo(() => Object.fromEntries(environment.map((item) => [item.key, item.value])), [environment]);
 
   const submitEvent = (event) => {
     event.preventDefault();
-    const preset = EVENT_PRESETS[eventForm.kind] ?? {};
-    eventMutation.mutate({
-      kind: eventForm.kind,
-      title: eventForm.title || preset.title || eventForm.kind,
-      scheduledAt: toWorldIso(eventDate),
-      intensity: Number(eventForm.intensity),
-      scope: eventForm.scope || 'world',
-      data: { leadTimeMs: 6 * 60 * 60 * 1000, durationMs: 6 * 60 * 60 * 1000, effects: preset.effects ?? [] },
-    });
+    if (willInstruction.trim()) eventMutation.mutate(willInstruction.trim());
   };
 
   return (
@@ -275,23 +249,32 @@ export default function WorldConsole() {
             </div>
           </Panel>
 
-          <Panel title="投放世界事件" eyebrow="命运">
+          <Panel title="向世界下达意志" eyebrow="世界意志 Agent">
             <form className="world-event-form" onSubmit={submitEvent}>
-              <label>事件类型
-                <select value={eventForm.kind} onChange={(event) => {
-                  const kind = event.target.value;
-                  setEventForm((current) => ({ ...current, kind, title: EVENT_PRESETS[kind]?.title ?? current.title }));
-                }}>
-                  {Object.keys(EVENT_PRESETS).map((kind) => <option key={kind} value={kind}>{EVENT_PRESETS[kind].title}</option>)}
-                </select>
+              <label>描述事件如何发生、何时发生
+                <textarea
+                  rows="8"
+                  value={willInstruction}
+                  onChange={(event) => setWillInstruction(event.target.value)}
+                  placeholder="例如：明天 14:00，一场台风从舰船东侧登陆。提前 6 小时发布警报；登陆时舰桥短暂断电、交通封闭；4 小时后风雨减弱，但维修廊积水。"
+                />
               </label>
-              <label>事件名称<input value={eventForm.title} onChange={(event) => setEventForm((current) => ({ ...current, title: event.target.value }))} /></label>
-              <label>发生时间<input type="datetime-local" value={eventDate} onChange={(event) => setEventForm((current) => ({ ...current, scheduledAt: event.target.value }))} /></label>
-              <label>影响范围<input value={eventForm.scope} onChange={(event) => setEventForm((current) => ({ ...current, scope: event.target.value }))} /></label>
-              <label>强度：{Math.round(eventForm.intensity * 100)}
-                <input type="range" min="0.1" max="1" step="0.1" value={eventForm.intensity} onChange={(event) => setEventForm((current) => ({ ...current, intensity: Number(event.target.value) }))} />
-              </label>
-              <Button type="submit" variant="primary" disabled={eventMutation.isPending}>{eventMutation.isPending ? '写入命运...' : '发布事件'}</Button>
+              <small>独立 Agent 会结合当前世界时间、地点和人物，把你的描述整理成可执行时间线。明确写出时间与过程，结果会更可控。</small>
+              <Button type="submit" variant="primary" disabled={eventMutation.isPending || !willInstruction.trim()}>
+                {eventMutation.isPending ? '世界意志正在规划...' : '交给世界意志 Agent'}
+              </Button>
+              {eventMutation.error && <StatusBanner tone="error">{eventMutation.error.message}</StatusBanner>}
+              {willResult?.plan && (
+                <div className="will-plan-result">
+                  <strong>已接受：{willResult.event?.title}</strong>
+                  <p>{willResult.plan.rationale || '时间线已写入世界。'}</p>
+                  <ol>
+                    {willResult.plan.timeline.map((step) => (
+                      <li key={`${step.at}:${step.phase}`}><time>{formatWorldTime(step.at)}</time> · {step.description}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </form>
           </Panel>
 
@@ -312,6 +295,7 @@ export default function WorldConsole() {
                   <div><strong>{event.title}</strong><small>{event.scope} · 强度 {Math.round(event.intensity * 100)}</small></div>
                   <Badge tone={event.status === 'active' ? 'warning' : event.status === 'completed' ? 'neutral' : 'success'}>{event.status}</Badge>
                   <time>{formatWorldTime(event.scheduledAt)}</time>
+                  {event.data?.timeline?.length > 0 && <small>{event.data.timeline.length} 个执行节点 · 由世界意志 Agent 规划</small>}
                 </article>
               ))}
             </div>
