@@ -1,0 +1,45 @@
+{
+  "tickMinutes": 60,
+  "agents": {
+    "he": {
+      "needs": { "energy": 78, "satiety": 72, "social": 55, "safety": 82 },
+      "shelterLocation": "会议室",
+      "schedule": [
+        { "at": "08:00", "action": "work", "location": "舰桥" },
+        { "at": "12:00", "action": "eat", "location": "食堂" },
+        { "at": "18:00", "action": "inspect", "location": "舰桥" }
+      ],
+      "goals": ["保护船员", "恢复指挥秩序"]
+    },
+    "mobai": {
+      "needs": { "energy": 82, "satiety": 68, "social": 65, "safety": 70 },
+      "shelterLocation": "会议室",
+      "schedule": [
+        { "at": "08:00", "action": "work", "location": "舰桥" },
+        { "at": "12:00", "action": "eat", "location": "食堂" },
+        { "at": "01:00", "action": "inspect", "location": "纠缠舱" }
+      ],
+      "goals": ["维持可信形象", "控制纠缠链路调查"]
+    },
+    "chensu": {
+      "needs": { "energy": 70, "satiety": 75, "social": 42, "safety": 76 },
+      "shelterLocation": "维修廊",
+      "schedule": [
+        { "at": "07:00", "action": "inspect", "location": "维修廊" },
+        { "at": "12:00", "action": "eat", "location": "食堂" },
+        { "at": "15:00", "action": "inspect", "location": "纠缠舱" }
+      ],
+      "goals": ["找到故障原因", "保存技术证据"]
+    },
+    "dou": {
+      "needs": { "energy": 74, "satiety": 65, "social": 78, "safety": 58 },
+      "shelterLocation": "食堂",
+      "schedule": [
+        { "at": "09:00", "action": "inspect", "location": "通风管" },
+        { "at": "12:00", "action": "eat", "location": "食堂" },
+        { "at": "20:00", "action": "socialize", "location": "食堂" }
+      ],
+      "goals": ["弄清听见的回声", "让其他人相信自己的目击"]
+    }
+  }
+}

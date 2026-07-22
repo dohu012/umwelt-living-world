@@ -29,6 +29,8 @@ The first living-world slice adds:
 - a SQLite-backed scheduled job queue that survives process restarts;
 - staged world-will events (`forecast` → `impact` → `aftermath`);
 - persistent agent decision points and non-binding world-will suggestions;
+- autonomous agent needs, schedules, movement, work, rest, eating, socializing, and sheltering;
+- persistent environment state changed by staged weather events;
 - a background worker that ticks every world even when no player is connected;
 - REST endpoints for clock control, event scheduling, decisions, and manual ticking.
 
@@ -70,6 +72,9 @@ POST /api/worlds/纠缠号/simulation/clock
 GET  /api/worlds/纠缠号/simulation/events
 POST /api/worlds/纠缠号/simulation/events
 GET  /api/worlds/纠缠号/simulation/decisions
+GET  /api/worlds/纠缠号/simulation/agents
+GET  /api/worlds/纠缠号/simulation/environment
+POST /api/worlds/纠缠号/simulation/decisions
 POST /api/worlds/纠缠号/simulation/decisions/:decisionId/suggestions
 POST /api/worlds/纠缠号/simulation/tick
 ```

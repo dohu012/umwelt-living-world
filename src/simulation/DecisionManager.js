@@ -14,6 +14,7 @@ export class DecisionManager {
     const normalized = options.map((option, index) => ({
       id: String(option.id ?? index + 1),
       label: String(option.label ?? option),
+      weight: Number(option.weight ?? 0.5),
     }));
     const result = this.db.prepare(`
       INSERT INTO decision_points (agent_id, prompt, options, context, due_at, created_at)
@@ -33,9 +34,10 @@ export class DecisionManager {
     const row = this.db.prepare('SELECT * FROM decision_points WHERE id = ?').get(id);
     if (!row) return null;
     const suggestions = this.db.prepare(
-      'SELECT id, content, strength, created_at FROM world_will_suggestions WHERE decision_id = ? ORDER BY id',
+      'SELECT id, option_id, content, strength, created_at FROM world_will_suggestions WHERE decision_id = ? ORDER BY id',
     ).all(id).map((item) => ({
       id: item.id,
+      optionId: item.option_id,
       content: item.content,
       strength: item.strength,
       createdAt: item.created_at,
@@ -61,17 +63,20 @@ export class DecisionManager {
     ).pluck().all().map((id) => this.get(id));
   }
 
-  suggest(decisionId, { content, strength = 0.5 }) {
+  suggest(decisionId, { content, optionId = null, strength = 0.5 }) {
     const decision = this.get(decisionId);
     if (!decision) throw new Error(`decision ${decisionId} not found`);
     if (decision.status !== 'open') throw new Error(`decision ${decisionId} is not open`);
     const value = Number(strength);
     if (!content?.trim()) throw new Error('suggestion content is required');
+    if (optionId != null && !decision.options.some((option) => option.id === String(optionId))) {
+      throw new Error(`unknown option ${optionId}`);
+    }
     if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('strength must be between 0 and 1');
     this.db.prepare(`
-      INSERT INTO world_will_suggestions (decision_id, content, strength, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(decisionId, content.trim(), value, this.now().toISOString());
+      INSERT INTO world_will_suggestions (decision_id, option_id, content, strength, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(decisionId, optionId == null ? null : String(optionId), content.trim(), value, this.now().toISOString());
     return this.get(decisionId);
   }
 

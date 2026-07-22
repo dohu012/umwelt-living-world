@@ -12,6 +12,8 @@ import { JobQueue } from '../simulation/JobQueue.js';
 import { DecisionManager } from '../simulation/DecisionManager.js';
 import { WorldEventEngine } from '../simulation/WorldEventEngine.js';
 import { WorldEngine } from '../simulation/WorldEngine.js';
+import { EnvironmentStore } from '../simulation/EnvironmentStore.js';
+import { LifeSimulator } from '../simulation/LifeSimulator.js';
 
 /**
  * Lazily opens and caches one { db, store, agentRegistry, locationRegistry } bundle per world
@@ -58,9 +60,19 @@ export class WorldRegistry {
     const clock = new WorldClock(db);
     const queue = new JobQueue(db);
     const decisions = new DecisionManager(db);
+    const environment = new EnvironmentStore(db);
     const worldNow = () => new Date(clock.getState().worldTime);
-    const worldEvents = new WorldEventEngine({ db, queue, eventStore: store, now: worldNow });
-    const engine = new WorldEngine({ clock, queue, worldEvents });
+    const worldEvents = new WorldEventEngine({ db, queue, eventStore: store, environment, now: worldNow });
+    const lifeSimulator = new LifeSimulator({
+      db,
+      store,
+      agentRegistry,
+      locationRegistry,
+      environment,
+      decisions,
+      worldDir,
+    });
+    const engine = new WorldEngine({ clock, queue, worldEvents, lifeSimulator });
     const world = {
       worldId,
       worldDir,
@@ -72,6 +84,8 @@ export class WorldRegistry {
       clock,
       queue,
       decisions,
+      environment,
+      lifeSimulator,
       worldEvents,
       engine,
     };
@@ -125,6 +139,10 @@ export class WorldRegistry {
     if (fs.existsSync(worldJson)) fs.copyFileSync(worldJson, path.join(dstDir, 'world.json'));
     const storyMd = path.join(srcDir, 'STORY.md');
     if (fs.existsSync(storyMd)) fs.copyFileSync(storyMd, path.join(dstDir, 'STORY.md'));
+    const livingWorldConfig = path.join(srcDir, 'living-world.json');
+    if (fs.existsSync(livingWorldConfig)) {
+      fs.copyFileSync(livingWorldConfig, path.join(dstDir, 'living-world.json'));
+    }
 
     if (keepContext) {
       const src = this.getWorld(sourceId);

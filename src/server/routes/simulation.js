@@ -40,6 +40,16 @@ export function simulationRouter(worldRegistry) {
     if (current) res.json({ events: current.worldEvents.list() });
   });
 
+  router.get('/environment', (req, res) => {
+    const current = world(req, res);
+    if (current) res.json({ environment: current.environment.list(req.query.scope ?? null) });
+  });
+
+  router.get('/agents', (req, res) => {
+    const current = world(req, res);
+    if (current) res.json({ agents: current.lifeSimulator.listAgents(current.clock.getState().worldTime) });
+  });
+
   router.post('/events', (req, res) => {
     const current = world(req, res);
     if (!current) return;
@@ -54,6 +64,16 @@ export function simulationRouter(worldRegistry) {
   router.get('/decisions', (req, res) => {
     const current = world(req, res);
     if (current) res.json({ decisions: current.decisions.listOpen() });
+  });
+
+  router.post('/decisions', (req, res) => {
+    const current = world(req, res);
+    if (!current) return;
+    try {
+      res.status(201).json(current.decisions.create(req.body ?? {}));
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
   });
 
   router.post('/decisions/:decisionId/suggestions', (req, res) => {

@@ -109,7 +109,31 @@ CREATE INDEX IF NOT EXISTS idx_decision_points_open
 CREATE TABLE IF NOT EXISTS world_will_suggestions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   decision_id INTEGER NOT NULL REFERENCES decision_points(id) ON DELETE CASCADE,
+  option_id TEXT,
   content TEXT NOT NULL,
   strength REAL NOT NULL DEFAULT 0.5,
   created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS simulation_state (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS environment_state (
+  scope TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (scope, key)
+);
+
+CREATE TABLE IF NOT EXISTS agent_life_state (
+  agent_id TEXT PRIMARY KEY,
+  needs TEXT NOT NULL,
+  current_action TEXT,
+  action_data TEXT,
+  last_action_at TEXT,
+  updated_at TEXT NOT NULL
 );

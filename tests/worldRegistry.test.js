@@ -23,8 +23,13 @@ beforeEach(() => {
   const agentDir = path.join(tmp, 'world', 'src', 'agents', 'alice');
   fs.mkdirSync(agentDir, { recursive: true });
   fs.writeFileSync(path.join(agentDir, 'profile.json'), JSON.stringify(PROFILE));
+  fs.writeFileSync(
+    path.join(tmp, 'world', 'src', 'living-world.json'),
+    JSON.stringify({ tickMinutes: 60, agents: { alice: { goals: ['keep the tavern open'] } } }),
+  );
 
   const src = reg.getWorld('src');
+  src.lifeSimulator.listAgents('2026-07-22T00:00:00.000Z');
   const tavern = src.locationRegistry.ensure('Tavern'); // registers a non-default location
   src.store.append({ type: 'dialogue', actor: 'alice', subject: 'alice', content: 'Evening.' }, ['local:start', 'private:alice']);
   src.store.append({ type: 'state', actor: 'system', subject: 'alice', key: 'location', content: tavern.id }, ['private:alice']);
@@ -49,6 +54,8 @@ describe('WorldRegistry.copyWorld', () => {
     assert.equal(copy.store.getFact('alice', 'location').content, 'tavern', 'position preserved');
     assert.equal(copy.store.getFact('alice', 'mood').content, 'wry', 'mood/state preserved');
     assert.ok(copy.locationRegistry.get('tavern'), 'the Tavern location travelled with the clone');
+    assert.deepEqual(copy.lifeSimulator.getAgent('alice').config.goals, ['keep the tavern open']);
+    assert.ok(fs.existsSync(path.join(copy.worldDir, 'living-world.json')), 'life configuration copied');
   });
 
   test('clearContext keeps only the characters — fresh event store, reset state and locations', async () => {
@@ -64,6 +71,7 @@ describe('WorldRegistry.copyWorld', () => {
     assert.ok(!copy.locationRegistry.get('tavern'), 'played-in locations are gone');
     assert.deepEqual(copy.locationRegistry.list().map((l) => l.id), ['start'], 'location map reset to just Start');
     assert.equal(copy.store.getEventsWithTags().some((e) => e.content === 'Evening.'), false, 'no prior dialogue');
+    assert.deepEqual(copy.lifeSimulator.listAgents()[0].config.goals, ['keep the tavern open']);
   });
 
   test('names collide-safely (appends a suffix)', async () => {

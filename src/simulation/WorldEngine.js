@@ -1,8 +1,9 @@
 export class WorldEngine {
-  constructor({ clock, queue, worldEvents }) {
+  constructor({ clock, queue, worldEvents, lifeSimulator = null }) {
     this.clock = clock;
     this.queue = queue;
     this.worldEvents = worldEvents;
+    this.lifeSimulator = lifeSimulator;
   }
 
   async tick({ limit = 100 } = {}) {
@@ -25,6 +26,7 @@ export class WorldEngine {
         results.push({ jobId: job.id, ok: false, error: error.message });
       }
     }
-    return { clock, processed: results.length, results };
+    const life = this.lifeSimulator?.advanceTo(clock.worldTime) ?? null;
+    return { clock, processed: results.length, results, life };
   }
 }

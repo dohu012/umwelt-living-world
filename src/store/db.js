@@ -13,6 +13,12 @@ export function openDb(dbPath) {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
 
+  // Small idempotent migrations for databases created by earlier living-world builds.
+  const suggestionColumns = db.prepare('PRAGMA table_info(world_will_suggestions)').all();
+  if (!suggestionColumns.some((column) => column.name === 'option_id')) {
+    db.exec('ALTER TABLE world_will_suggestions ADD COLUMN option_id TEXT');
+  }
+
   // Seeds the atomic seq counter above the current max for pre-existing databases
   // (fresh databases start at 0, matching the old MAX(seq)+1-from-empty behavior).
   // OR IGNORE, not a `WHERE NOT EXISTS` guard on the SELECT: an aggregate query without GROUP BY

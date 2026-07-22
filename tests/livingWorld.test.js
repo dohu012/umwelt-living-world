@@ -11,6 +11,7 @@ import { JobQueue } from '../src/simulation/JobQueue.js';
 import { DecisionManager } from '../src/simulation/DecisionManager.js';
 import { WorldEventEngine } from '../src/simulation/WorldEventEngine.js';
 import { WorldEngine } from '../src/simulation/WorldEngine.js';
+import { EnvironmentStore } from '../src/simulation/EnvironmentStore.js';
 
 function fixture(start = '2026-07-22T00:00:00.000Z') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'umwelt-living-world-'));
@@ -21,7 +22,8 @@ function fixture(start = '2026-07-22T00:00:00.000Z') {
   const clock = new WorldClock(db, { now: nowFn, initialWorldTime: start });
   const queue = new JobQueue(db, { now: nowFn });
   const decisions = new DecisionManager(db, { now: nowFn });
-  const events = new WorldEventEngine({ db, queue, eventStore: store, now: () => new Date(clock.getState().worldTime) });
+  const environment = new EnvironmentStore(db, { now: nowFn });
+  const events = new WorldEventEngine({ db, queue, eventStore: store, environment, now: () => new Date(clock.getState().worldTime) });
   const engine = new WorldEngine({ clock, queue, worldEvents: events });
   return {
     db,
@@ -29,6 +31,7 @@ function fixture(start = '2026-07-22T00:00:00.000Z') {
     clock,
     queue,
     decisions,
+    environment,
     events,
     engine,
     setNow(value) { now = new Date(value); },
@@ -63,12 +66,15 @@ test('world-will event unfolds through forecast, impact, and aftermath', async (
     f.clock.advanceBy(6 * 60 * 60 * 1000);
     assert.equal((await f.engine.tick()).processed, 1);
     assert.equal(f.events.get(event.id).status, 'forecast');
+    assert.equal(f.environment.get('world', 'weather.alert').value.kind, 'typhoon');
     f.clock.advanceBy(6 * 60 * 60 * 1000);
     assert.equal((await f.engine.tick()).processed, 1);
     assert.equal(f.events.get(event.id).status, 'active');
+    assert.equal(f.environment.get('world', 'weather.current').value, 'typhoon');
     f.clock.advanceBy(3 * 60 * 60 * 1000);
     assert.equal((await f.engine.tick()).processed, 1);
     assert.equal(f.events.get(event.id).status, 'completed');
+    assert.equal(f.environment.get('world', 'weather.current').value, 'aftermath');
     assert.deepEqual(
       f.store.getRecentEvents().filter((item) => item.type === 'world_event').map((item) => item.key),
       ['forecast', 'impact', 'aftermath'],
@@ -91,11 +97,13 @@ test('world will can advise an agent without resolving their decision', () => {
     });
     const advised = f.decisions.suggest(decision.id, {
       content: '先备份记录，不要打草惊蛇。',
+      optionId: 'investigate',
       strength: 0.7,
     });
     assert.equal(advised.status, 'open');
     assert.equal(advised.chosenOptionId, null);
     assert.equal(advised.suggestions[0].content, '先备份记录，不要打草惊蛇。');
+    assert.equal(advised.suggestions[0].optionId, 'investigate');
     const resolved = f.decisions.resolve(decision.id, 'investigate');
     assert.equal(resolved.status, 'resolved');
     assert.equal(resolved.chosenOptionId, 'investigate');

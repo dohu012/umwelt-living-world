@@ -4,12 +4,14 @@ function parse(value) {
 }
 
 const HOUR = 60 * 60 * 1000;
+const WEATHER_KINDS = new Set(['typhoon', 'storm', 'rain', 'snow', 'heatwave', 'blizzard']);
 
 export class WorldEventEngine {
-  constructor({ db, queue, eventStore, now = () => new Date() }) {
+  constructor({ db, queue, eventStore, environment = null, now = () => new Date() }) {
     this.db = db;
     this.queue = queue;
     this.eventStore = eventStore;
+    this.environment = environment;
     this.now = now;
   }
 
@@ -50,6 +52,7 @@ export class WorldEventEngine {
     const status = phase === 'forecast' ? 'forecast' : phase === 'impact' ? 'active' : 'completed';
     this.db.prepare('UPDATE world_events SET status = ?, updated_at = ? WHERE id = ?')
       .run(status, worldTime, eventId);
+    this._applyEnvironment(event, phase, worldTime);
     this.eventStore.append({
       ts: worldTime,
       type: 'world_event',
@@ -60,6 +63,33 @@ export class WorldEventEngine {
       data: { ...event, phase, status },
     }, ['global', 'system:world-event']);
     return { ...event, phase, status };
+  }
+
+  _applyEnvironment(event, phase, worldTime) {
+    if (!this.environment) return;
+    this.environment.set('world', `event.${event.kind}`, {
+      phase,
+      title: event.title,
+      intensity: event.intensity,
+      scope: event.scope,
+    }, { at: worldTime });
+    if (!WEATHER_KINDS.has(event.kind)) return;
+    if (phase === 'forecast') {
+      this.environment.set('world', 'weather.alert', {
+        kind: event.kind,
+        title: event.title,
+        intensity: event.intensity,
+        scheduledAt: event.scheduledAt,
+      }, { at: worldTime });
+      return;
+    }
+    if (phase === 'impact') {
+      this.environment.set('world', 'weather.current', event.kind, { at: worldTime });
+      this.environment.set('world', 'weather.intensity', event.intensity, { at: worldTime });
+      return;
+    }
+    this.environment.set('world', 'weather.current', 'aftermath', { at: worldTime });
+    this.environment.set('world', 'weather.alert', null, { at: worldTime });
   }
 
   _serialize(row) {
