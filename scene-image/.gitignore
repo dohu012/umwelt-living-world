@@ -1,0 +1,15 @@
+.env
+.env.local
+.venv/
+venv/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+output/*
+!output/.gitkeep
+*.png
+*.jpg
+*.webp
+!examples/**/*.png

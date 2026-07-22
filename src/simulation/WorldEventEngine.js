@@ -1,0 +1,79 @@
+function parse(value) {
+  if (value == null) return null;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+const HOUR = 60 * 60 * 1000;
+
+export class WorldEventEngine {
+  constructor({ db, queue, eventStore, now = () => new Date() }) {
+    this.db = db;
+    this.queue = queue;
+    this.eventStore = eventStore;
+    this.now = now;
+  }
+
+  schedule({ kind, title, scheduledAt, intensity = 0.5, scope = 'world', data = {} }) {
+    if (!kind || !title) throw new Error('kind and title are required');
+    const scheduled = new Date(scheduledAt);
+    if (!Number.isFinite(scheduled.getTime())) throw new Error(`invalid scheduledAt: ${scheduledAt}`);
+    const level = Number(intensity);
+    if (!Number.isFinite(level) || level < 0 || level > 1) throw new Error('intensity must be between 0 and 1');
+    const now = this.now().toISOString();
+    const result = this.db.prepare(`
+      INSERT INTO world_events (kind, title, scheduled_at, intensity, scope, data, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(kind, title, scheduled.toISOString(), level, scope, JSON.stringify(data), now, now);
+    const eventId = Number(result.lastInsertRowid);
+    const leadTimeMs = Math.max(0, Number(data.leadTimeMs ?? 6 * HOUR));
+    const durationMs = Math.max(0, Number(data.durationMs ?? 6 * HOUR));
+    const forecastAt = new Date(Math.max(this.now().getTime(), scheduled.getTime() - leadTimeMs));
+    this.queue.schedule({ runAt: forecastAt, type: 'world_event_phase', subject: String(eventId), payload: { eventId, phase: 'forecast' } });
+    this.queue.schedule({ runAt: scheduled, type: 'world_event_phase', subject: String(eventId), payload: { eventId, phase: 'impact' } });
+    this.queue.schedule({ runAt: new Date(scheduled.getTime() + durationMs), type: 'world_event_phase', subject: String(eventId), payload: { eventId, phase: 'aftermath' } });
+    return this.get(eventId);
+  }
+
+  get(id) {
+    const row = this.db.prepare('SELECT * FROM world_events WHERE id = ?').get(id);
+    return row ? this._serialize(row) : null;
+  }
+
+  list({ limit = 100 } = {}) {
+    return this.db.prepare('SELECT * FROM world_events ORDER BY scheduled_at DESC, id DESC LIMIT ?')
+      .all(limit).map((row) => this._serialize(row));
+  }
+
+  handlePhase({ eventId, phase }, worldTime) {
+    const event = this.get(eventId);
+    if (!event) throw new Error(`world event ${eventId} not found`);
+    const status = phase === 'forecast' ? 'forecast' : phase === 'impact' ? 'active' : 'completed';
+    this.db.prepare('UPDATE world_events SET status = ?, updated_at = ? WHERE id = ?')
+      .run(status, worldTime, eventId);
+    this.eventStore.append({
+      ts: worldTime,
+      type: 'world_event',
+      actor: 'world-will',
+      subject: `world-event:${eventId}`,
+      key: phase,
+      content: `${event.title}: ${phase}`,
+      data: { ...event, phase, status },
+    }, ['global', 'system:world-event']);
+    return { ...event, phase, status };
+  }
+
+  _serialize(row) {
+    return {
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      status: row.status,
+      scheduledAt: row.scheduled_at,
+      intensity: row.intensity,
+      scope: row.scope,
+      data: parse(row.data) ?? {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+}

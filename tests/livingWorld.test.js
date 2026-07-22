@@ -1,0 +1,105 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import { openDb } from '../src/store/db.js';
+import { EventStore } from '../src/store/EventStore.js';
+import { WorldClock } from '../src/simulation/WorldClock.js';
+import { JobQueue } from '../src/simulation/JobQueue.js';
+import { DecisionManager } from '../src/simulation/DecisionManager.js';
+import { WorldEventEngine } from '../src/simulation/WorldEventEngine.js';
+import { WorldEngine } from '../src/simulation/WorldEngine.js';
+
+function fixture(start = '2026-07-22T00:00:00.000Z') {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'umwelt-living-world-'));
+  let now = new Date(start);
+  const nowFn = () => new Date(now);
+  const db = openDb(path.join(dir, 'events.db'));
+  const store = new EventStore(db);
+  const clock = new WorldClock(db, { now: nowFn, initialWorldTime: start });
+  const queue = new JobQueue(db, { now: nowFn });
+  const decisions = new DecisionManager(db, { now: nowFn });
+  const events = new WorldEventEngine({ db, queue, eventStore: store, now: () => new Date(clock.getState().worldTime) });
+  const engine = new WorldEngine({ clock, queue, worldEvents: events });
+  return {
+    db,
+    store,
+    clock,
+    queue,
+    decisions,
+    events,
+    engine,
+    setNow(value) { now = new Date(value); },
+    close() { db.close(); fs.rmSync(dir, { recursive: true, force: true }); },
+  };
+}
+
+test('world clock catches up from wall time and respects pause', () => {
+  const f = fixture();
+  try {
+    f.clock.setTimeScale(12);
+    f.setNow('2026-07-22T01:00:00.000Z');
+    assert.equal(f.clock.getState().worldTime, '2026-07-22T12:00:00.000Z');
+    f.clock.setStatus('paused');
+    f.setNow('2026-07-23T01:00:00.000Z');
+    assert.equal(f.clock.getState().worldTime, '2026-07-22T12:00:00.000Z');
+  } finally {
+    f.close();
+  }
+});
+
+test('world-will event unfolds through forecast, impact, and aftermath', async () => {
+  const f = fixture();
+  try {
+    const event = f.events.schedule({
+      kind: 'typhoon',
+      title: '台风登陆',
+      scheduledAt: '2026-07-22T12:00:00.000Z',
+      intensity: 0.8,
+      data: { leadTimeMs: 6 * 60 * 60 * 1000, durationMs: 3 * 60 * 60 * 1000 },
+    });
+    f.clock.advanceBy(6 * 60 * 60 * 1000);
+    assert.equal((await f.engine.tick()).processed, 1);
+    assert.equal(f.events.get(event.id).status, 'forecast');
+    f.clock.advanceBy(6 * 60 * 60 * 1000);
+    assert.equal((await f.engine.tick()).processed, 1);
+    assert.equal(f.events.get(event.id).status, 'active');
+    f.clock.advanceBy(3 * 60 * 60 * 1000);
+    assert.equal((await f.engine.tick()).processed, 1);
+    assert.equal(f.events.get(event.id).status, 'completed');
+    assert.deepEqual(
+      f.store.getRecentEvents().filter((item) => item.type === 'world_event').map((item) => item.key),
+      ['forecast', 'impact', 'aftermath'],
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('world will can advise an agent without resolving their decision', () => {
+  const f = fixture();
+  try {
+    const decision = f.decisions.create({
+      agentId: 'chensu',
+      prompt: '如何处理刚发现的权限日志？',
+      options: [
+        { id: 'confront', label: '质问墨白' },
+        { id: 'investigate', label: '继续秘密调查' },
+      ],
+    });
+    const advised = f.decisions.suggest(decision.id, {
+      content: '先备份记录，不要打草惊蛇。',
+      strength: 0.7,
+    });
+    assert.equal(advised.status, 'open');
+    assert.equal(advised.chosenOptionId, null);
+    assert.equal(advised.suggestions[0].content, '先备份记录，不要打草惊蛇。');
+    const resolved = f.decisions.resolve(decision.id, 'investigate');
+    assert.equal(resolved.status, 'resolved');
+    assert.equal(resolved.chosenOptionId, 'investigate');
+  } finally {
+    f.close();
+  }
+});

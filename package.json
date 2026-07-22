@@ -1,0 +1,23 @@
+{
+  "name": "umwelt-living-world",
+  "version": "0.1.0",
+  "description": "A persistent autonomous agent world shaped indirectly by the player",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "sim": "node src/cli/run-simulation.js",
+    "inspect": "node src/cli/inspect.js",
+    "serve": "node src/cli/serve.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "better-sqlite3": "^11.3.0",
+    "express": "^5.2.1",
+    "js-yaml": "^4.1.0",
+    "multer": "^2.2.0",
+    "ws": "^8.21.1"
+  }
+}

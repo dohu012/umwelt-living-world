@@ -1,0 +1,18 @@
+nim:
+  # Local llama.cpp server (OpenAI-compatible), stood up as an interim backend
+  # in place of NIM (NIM deploy on this DGX Spark box is a separate infra task).
+  # Swapping to real NIM later only means changing baseUrl/model here.
+  baseUrl: http://localhost:8000
+  model: tinyllama
+  apiKey: null
+  temperature: 0.8
+  maxTokens: 1500
+
+world:
+  id: 纠缠号
+  dataDir: data/world
+
+turn:
+  summarizeEveryNTurns: 6
+  imageGenEveryNRounds: 4
+  directorEveryNRounds: 3

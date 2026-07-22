@@ -1,0 +1,12 @@
+{
+  "location": "high school rooftop",
+  "time_of_day": "golden hour sunset",
+  "weather": "clear sky, light breeze",
+  "lighting": "warm orange sunlight from the side",
+  "mood": "quiet, nostalgic",
+  "key_props": ["chain-link fence", "water tower", "distant city"],
+  "camera": "wide establishing shot",
+  "art_style": "anime background art",
+  "no_characters": true,
+  "extra": []
+}

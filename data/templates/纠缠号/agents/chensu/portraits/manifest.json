@@ -1,0 +1,10 @@
+{
+  "default": "neutral.png",
+  "emotions": {
+    "neutral": "neutral.png",
+    "happy": "happy.png",
+    "angry": "angry.png",
+    "sad": "sad.png",
+    "fear": "fear.png"
+  }
+}

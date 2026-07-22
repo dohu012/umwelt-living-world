@@ -1,0 +1,14 @@
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.env
+scene-image/.env
+data/settings/*.json
+data/settings/personas/
+data/world/*
+!data/world/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+coverage/
+*.log
