@@ -1,9 +1,11 @@
 export class WorldEngine {
-  constructor({ clock, queue, worldEvents, lifeSimulator = null }) {
+  constructor({ clock, queue, worldEvents, lifeSimulator = null, autonomousScenes = null, sceneScheduler = null }) {
     this.clock = clock;
     this.queue = queue;
     this.worldEvents = worldEvents;
     this.lifeSimulator = lifeSimulator;
+    this.autonomousScenes = autonomousScenes;
+    this.sceneScheduler = sceneScheduler;
   }
 
   async tick({ limit = 100 } = {}) {
@@ -16,6 +18,9 @@ export class WorldEngine {
         let result;
         if (job.type === 'world_event_phase') {
           result = this.worldEvents.handlePhase(job.payload, clock.worldTime);
+        } else if (job.type === 'autonomous_scene') {
+          if (!this.autonomousScenes) throw new Error('autonomous scene runner is not configured');
+          result = await this.autonomousScenes.run(job.payload, clock.worldTime);
         } else {
           throw new Error(`no handler for job type "${job.type}"`);
         }
@@ -27,6 +32,7 @@ export class WorldEngine {
       }
     }
     const life = this.lifeSimulator?.advanceTo(clock.worldTime) ?? null;
-    return { clock, processed: results.length, results, life };
+    const scheduledScenes = this.sceneScheduler?.scheduleFromLife(life, clock.worldTime) ?? [];
+    return { clock, processed: results.length, results, life, scheduledScenes: scheduledScenes.length };
   }
 }

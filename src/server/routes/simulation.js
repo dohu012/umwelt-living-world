@@ -54,15 +54,15 @@ export function simulationRouter(worldRegistry) {
     const current = world(req, res);
     if (!current) return;
     const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 100));
-    const activityTypes = new Set(['life_action', 'decision_resolved', 'world_event']);
+    const activityTypes = new Set(['life_action', 'decision_resolved', 'world_event', 'autonomous_scene']);
     const events = current.store.getEventsWithTags()
-      .filter((event) => activityTypes.has(event.type))
-      .slice(-limit)
-      .reverse()
       .map((event) => ({
         ...event,
         data: parseEventData(event.data),
-      }));
+      }))
+      .filter((event) => activityTypes.has(event.type) || event.data?.autonomous === true)
+      .slice(-limit)
+      .reverse();
     res.json({ events });
   });
 

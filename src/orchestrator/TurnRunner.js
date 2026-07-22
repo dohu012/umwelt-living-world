@@ -57,7 +57,10 @@ export class TurnRunner {
    * back to the dialogue client when nothing else is configured, so a single-provider setup (CLI,
    * or a fresh server install) never needs a second provider just to keep working.
    */
-  async runTurn(agentId, { onToken, llmClient, utilityLlmClient, resolveName, roster, witnessIds = [] } = {}) {
+  async runTurn(agentId, {
+    onToken, llmClient, utilityLlmClient, resolveName, roster, witnessIds = [],
+    extraTags = [], eventData = undefined, eventTs = undefined,
+  } = {}) {
     const client = llmClient ?? this.llmClient;
     const utilClient = utilityLlmClient ?? this.utilityLlmClient ?? client;
     // Turn actor ids into display names for every prompt so ids never surface in model output.
@@ -119,10 +122,14 @@ export class TurnRunner {
         interpolateTag('local:{state.location}', tagCtx),
         interpolateTag('private:{self}', tagCtx),
         ...witnessIds.filter((id) => id !== agentId).map((id) => `private:${id}`),
+        ...extraTags,
       ].filter(Boolean);
 
       const dialogueEvent = this.store.append(
-        { type: 'dialogue', actor: agentId, subject: agentId, content: dialogueText, turnId },
+        {
+          type: 'dialogue', actor: agentId, subject: agentId, content: dialogueText,
+          data: eventData, ts: eventTs, turnId,
+        },
         dialogueTags,
       );
 

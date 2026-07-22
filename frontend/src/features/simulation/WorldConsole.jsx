@@ -136,6 +136,15 @@ function historyText(event) {
   if (event.type === 'decision_resolved') {
     return `${event.actor} 决定「${event.content}」· ${event.data?.adviceOutcome ?? 'no_advice'}`;
   }
+  if (event.type === 'dialogue' && event.data?.autonomous) {
+    return `${event.actor}：${event.content}`;
+  }
+  if (event.type === 'narration' && event.data?.autonomous) {
+    return event.content;
+  }
+  if (event.type === 'autonomous_scene') {
+    return event.content;
+  }
   const location = event.data?.location ? ` · ${event.data.location}` : '';
   return `${event.actor}：${ACTION_LABELS[event.content] ?? event.content}${location}`;
 }
@@ -152,6 +161,7 @@ export default function WorldConsole() {
   const eventsQuery = useQuery({ queryKey: [...queryRoot, 'events'], queryFn: () => api.get(`/api/worlds/${worldId}/simulation/events`), ...queryOptions });
   const decisionsQuery = useQuery({ queryKey: [...queryRoot, 'decisions'], queryFn: () => api.get(`/api/worlds/${worldId}/simulation/decisions?status=open`), ...queryOptions });
   const historyQuery = useQuery({ queryKey: [...queryRoot, 'history'], queryFn: () => api.get(`/api/worlds/${worldId}/simulation/history?limit=80`), ...queryOptions });
+  const providersQuery = useQuery({ queryKey: ['providers', 'world-console'], queryFn: () => api.get('/api/settings/providers') });
   const [eventForm, setEventForm] = useState({ kind: 'typhoon', title: '台风登陆', scheduledAt: '', intensity: 0.8, scope: 'world' });
 
   const controlMutation = useMutation({
@@ -171,7 +181,7 @@ export default function WorldConsole() {
     onSuccess: (_, variables) => { refresh(); variables.after?.(); },
   });
 
-  const errors = [clockQuery.error, agentsQuery.error, environmentQuery.error, eventsQuery.error, decisionsQuery.error, historyQuery.error]
+  const errors = [clockQuery.error, agentsQuery.error, environmentQuery.error, eventsQuery.error, decisionsQuery.error, historyQuery.error, providersQuery.error]
     .filter(Boolean);
   const clock = clockQuery.data;
   const eventDate = eventForm.scheduledAt || worldInputValue(clock?.worldTime, 24);
@@ -253,6 +263,18 @@ export default function WorldConsole() {
         </div>
 
         <aside className="will-side-column">
+          <Panel title="Agent 自主交流" eyebrow="后台剧情">
+            <div className="environment-list">
+              <div>
+                <span>运行状态</span>
+                <Badge tone={providersQuery.data?.activeByKind?.dialogue ? 'success' : 'warning'}>
+                  {providersQuery.data?.activeByKind?.dialogue ? '已启用' : '等待对话模型'}
+                </Badge>
+              </div>
+              <p>角色在同一地点相遇后会自主开启场景。每个地点有 6 个世界小时冷却，对话会永久写入下方“世界流动”。</p>
+            </div>
+          </Panel>
+
           <Panel title="投放世界事件" eyebrow="命运">
             <form className="world-event-form" onSubmit={submitEvent}>
               <label>事件类型

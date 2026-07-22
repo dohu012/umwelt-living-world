@@ -199,6 +199,9 @@ export default function PlayShell() {
           控制台
         </button>
       </div>
+      <Link to={`/worlds/${worldId}/simulation`}>
+        <Button size="sm" variant="primary">世界意志</Button>
+      </Link>
       {metadataIntro && (
         <Button size="sm" onClick={() => setIntroManuallyOpen(true)}>
           介绍

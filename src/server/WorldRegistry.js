@@ -14,6 +14,8 @@ import { WorldEventEngine } from '../simulation/WorldEventEngine.js';
 import { WorldEngine } from '../simulation/WorldEngine.js';
 import { EnvironmentStore } from '../simulation/EnvironmentStore.js';
 import { LifeSimulator } from '../simulation/LifeSimulator.js';
+import { AutonomousSceneScheduler } from '../simulation/AutonomousSceneScheduler.js';
+import { AutonomousSceneRunner } from '../simulation/AutonomousSceneRunner.js';
 
 /**
  * Lazily opens and caches one { db, store, agentRegistry, locationRegistry } bundle per world
@@ -21,10 +23,11 @@ import { LifeSimulator } from '../simulation/LifeSimulator.js';
  * server process.
  */
 export class WorldRegistry {
-  constructor({ projectRoot, dataDir }) {
+  constructor({ projectRoot, dataDir, providerSettingsStore = null }) {
     this.projectRoot = projectRoot;
     this.worldsRoot = path.join(projectRoot, dataDir);
     this._cache = new Map();
+    this.providerSettingsStore = providerSettingsStore;
   }
 
   listTemplateIds() {
@@ -72,7 +75,11 @@ export class WorldRegistry {
       decisions,
       worldDir,
     });
-    const engine = new WorldEngine({ clock, queue, worldEvents, lifeSimulator });
+    const sceneScheduler = new AutonomousSceneScheduler({ db, queue });
+    const autonomousScenes = new AutonomousSceneRunner({
+      store, agentRegistry, locationRegistry, worldDir, providerSettingsStore: this.providerSettingsStore,
+    });
+    const engine = new WorldEngine({ clock, queue, worldEvents, lifeSimulator, autonomousScenes, sceneScheduler });
     const world = {
       worldId,
       worldDir,
@@ -86,6 +93,8 @@ export class WorldRegistry {
       decisions,
       environment,
       lifeSimulator,
+      sceneScheduler,
+      autonomousScenes,
       worldEvents,
       engine,
     };

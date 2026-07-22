@@ -13,12 +13,12 @@ import { personasRouter } from './routes/personas.js';
 import { simulationRouter } from './routes/simulation.js';
 
 export function createApp({ projectRoot, dataDir, nimConfig, summarizeEveryNTurns = 0 }) {
-  const worldRegistry = new WorldRegistry({ projectRoot, dataDir });
-
   const providerSettingsStore = new ProviderSettingsStore(
     path.join(projectRoot, 'data/settings/providers.json'),
   );
   providerSettingsStore.seedFromEnv(nimConfig);
+
+  const worldRegistry = new WorldRegistry({ projectRoot, dataDir, providerSettingsStore });
 
   const personasDir = path.join(projectRoot, 'data/settings/personas');
   const personaStore = new PersonaStore(path.join(projectRoot, 'data/settings/personas.json'));
