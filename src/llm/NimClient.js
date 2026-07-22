@@ -36,11 +36,18 @@ export class NimClient {
     const headers = { 'Content-Type': 'application/json' };
     if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
 
-    const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+    const endpoint = `${this.baseUrl}/v1/chat/completions`;
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      const reason = error?.cause?.message ?? error?.message ?? String(error);
+      throw new Error(`LLM backend is unreachable at ${endpoint}: ${reason}`);
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');

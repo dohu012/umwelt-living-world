@@ -19,3 +19,17 @@ test('world will agent turns free-form intent into a scheduled executable plan',
   assert.equal(scheduled.instruction, '明早八点发布台风预警');
   assert.equal(scheduled.timeline[0].phase, 'warning');
 });
+
+test('world will agent reports which configured model could not be reached', async () => {
+  const agent = new WorldWillAgent({
+    providerSettingsStore: { getActiveForKind: () => ({ name: 'Local', model: 'tiny', baseUrl: 'http://localhost:8000' }) },
+    worldEvents: { schedulePlan: () => null },
+    agentRegistry: { listAgentIds: () => [] },
+    locationRegistry: { list: () => [] },
+    createClient: () => ({ chatCompletion: async () => { throw new Error('connection refused'); } }),
+  });
+  await assert.rejects(
+    () => agent.planAndSchedule({ instruction: '今晚停电', worldTime: '2026-07-22T12:00:00.000Z' }),
+    /Local \/ tiny.*localhost:8000.*connection refused/,
+  );
+});

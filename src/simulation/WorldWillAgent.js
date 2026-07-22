@@ -41,17 +41,24 @@ export class WorldWillAgent {
       'description 要具体、可叙事，说明事件如何显现，而不只是重复标题。最后一个节点应描述稳定状态或余波。',
     ].join('\n');
     const client = this.createClient({ nim: provider });
-    const raw = await client.chatCompletion({
-      system,
-      messages: [{
-        role: 'user',
-        content: JSON.stringify({ currentWorldTime: worldTime, knownLocations: locations, knownAgents: agents, instruction: instruction.trim() }),
-      }],
-      temperature: 0.2,
-      maxTokens: 1800,
-    });
+    let raw;
+    try {
+      raw = await client.chatCompletion({
+        system,
+        messages: [{
+          role: 'user',
+          content: JSON.stringify({ currentWorldTime: worldTime, knownLocations: locations, knownAgents: agents, instruction: instruction.trim() }),
+        }],
+        temperature: 0.2,
+        maxTokens: 1800,
+      });
+    } catch (error) {
+      throw new Error(
+        `世界意志 Agent 无法调用模型“${provider.name ?? '未命名'} / ${provider.model}”` +
+        `（${provider.baseUrl}）：${error.message}`,
+      );
+    }
     const plan = parseJsonObject(raw);
     return this.worldEvents.schedulePlan({ ...plan, instruction: instruction.trim() });
   }
 }
-

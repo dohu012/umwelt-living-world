@@ -95,6 +95,9 @@ export function simulationRouter(worldRegistry) {
       if (/请描述|需要一个|计划|时间无效|缺少/.test(error.message)) {
         return res.status(400).json({ error: error.message });
       }
+      if (/无法调用模型|unreachable/i.test(error.message)) {
+        return res.status(502).json({ error: error.message });
+      }
       next(error);
     }
   });

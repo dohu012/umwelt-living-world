@@ -169,6 +169,10 @@ export default function WorldConsole() {
   const clock = clockQuery.data;
   const environment = environmentQuery.data?.environment ?? [];
   const weather = useMemo(() => Object.fromEntries(environment.map((item) => [item.key, item.value])), [environment]);
+  const activeDialogueProvider = useMemo(() => {
+    const id = providersQuery.data?.activeByKind?.dialogue;
+    return providersQuery.data?.providers?.find((provider) => provider.id === id) ?? null;
+  }, [providersQuery.data]);
 
   const submitEvent = (event) => {
     event.preventDefault();
@@ -242,10 +246,14 @@ export default function WorldConsole() {
               <div>
                 <span>运行状态</span>
                 <Badge tone={providersQuery.data?.activeByKind?.dialogue ? 'success' : 'warning'}>
-                  {providersQuery.data?.activeByKind?.dialogue ? '已启用' : '等待对话模型'}
+                  {providersQuery.data?.activeByKind?.dialogue ? '已配置' : '等待对话模型'}
                 </Badge>
               </div>
+              {activeDialogueProvider && (
+                <div><span>当前模型</span><strong>{activeDialogueProvider.name} / {activeDialogueProvider.model}</strong></div>
+              )}
               <p>角色在同一地点相遇后会自主开启场景。每个地点有 6 个世界小时冷却，对话会永久写入下方“世界流动”。</p>
+              <p>“已配置”不代表模型服务在线；自主交流和世界意志都需要该接口保持可访问。</p>
             </div>
           </Panel>
 
