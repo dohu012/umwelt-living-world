@@ -153,6 +153,9 @@ function WorldCard({
         <Link to={`/worlds/${worldId}/inspector`}>
           <Button>打开调试台</Button>
         </Link>
+        <Link to={`/worlds/${worldId}/simulation`}>
+          <Button>世界意志</Button>
+        </Link>
         <Button onClick={() => onOpenCopy(worldId)}>复制</Button>
         <Button variant="danger" onClick={() => onOpenDelete(worldId)}>
           删除

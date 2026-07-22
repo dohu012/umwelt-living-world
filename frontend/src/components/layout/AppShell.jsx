@@ -33,6 +33,13 @@ function NavIcon({ name }) {
         <circle cx="17" cy="17" r="2.4" />
       </>
     ),
+    will: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2.8v3.1M12 18.1v3.1M2.8 12h3.1M18.1 12h3.1" />
+        <path d="m5.5 5.5 2.2 2.2M16.3 16.3l2.2 2.2M18.5 5.5l-2.2 2.2M7.7 16.3l-2.2 2.2" />
+      </>
+    ),
     persona: (
       <>
         <path d="M12 4.2 18.5 7.8v8.4L12 19.8l-6.5-3.6V7.8L12 4.2Z" />
@@ -127,6 +134,9 @@ export default function AppShell() {
             </div>
             <div className="nav-section">
               <div className="nav-label">观测</div>
+              <NavLink to={`/worlds/${worldId}/simulation`} title="世界意志">
+                {navLabel('世界意志', 'will')}
+              </NavLink>
               <NavLink to={`/worlds/${worldId}/inspector`} title="调试台">
                 {navLabel('调试台', 'inspect')}
               </NavLink>

@@ -8,6 +8,7 @@ import ProviderSettings from './routes/ProviderSettings.jsx';
 import ChatRoom from './routes/ChatRoom.jsx';
 import InspectorPage from './features/inspector/InspectorPage.jsx';
 import AppErrorBoundary from './components/layout/AppErrorBoundary.jsx';
+import WorldConsole from './features/simulation/WorldConsole.jsx';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="worlds/:worldId/play/:location" element={<ChatRoom />} />
           <Route path="worlds/:worldId/rooms/:location" element={<ChatRoom />} />
           <Route path="worlds/:worldId/inspector" element={<InspectorPage />} />
+          <Route path="worlds/:worldId/simulation" element={<WorldConsole />} />
           <Route path="persona" element={<PersonaEditor />} />
           <Route path="settings/providers" element={<ProviderSettings />} />
         </Route>

@@ -2,6 +2,11 @@ import { Router } from 'express';
 
 const HOUR = 60 * 60 * 1000;
 
+function parseEventData(value) {
+  if (!value) return null;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
 export function simulationRouter(worldRegistry) {
   const router = Router({ mergeParams: true });
 
@@ -43,6 +48,22 @@ export function simulationRouter(worldRegistry) {
   router.get('/environment', (req, res) => {
     const current = world(req, res);
     if (current) res.json({ environment: current.environment.list(req.query.scope ?? null) });
+  });
+
+  router.get('/history', (req, res) => {
+    const current = world(req, res);
+    if (!current) return;
+    const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 100));
+    const activityTypes = new Set(['life_action', 'decision_resolved', 'world_event']);
+    const events = current.store.getEventsWithTags()
+      .filter((event) => activityTypes.has(event.type))
+      .slice(-limit)
+      .reverse()
+      .map((event) => ({
+        ...event,
+        data: parseEventData(event.data),
+      }));
+    res.json({ events });
   });
 
   router.get('/agents', (req, res) => {
