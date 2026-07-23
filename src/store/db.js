@@ -33,6 +33,17 @@ export function openDb(dbPath) {
     ON decision_points(source_key) WHERE source_key IS NOT NULL
   `);
 
+  const jobColumns = db.prepare('PRAGMA table_info(scheduled_jobs)').all();
+  for (const [name, declaration] of [
+    ['started_at', 'TEXT'],
+    ['attempts', 'INTEGER NOT NULL DEFAULT 0'],
+    ['max_attempts', 'INTEGER NOT NULL DEFAULT 3'],
+  ]) {
+    if (!jobColumns.some((column) => column.name === name)) {
+      db.exec(`ALTER TABLE scheduled_jobs ADD COLUMN ${name} ${declaration}`);
+    }
+  }
+
   // Seeds the atomic seq counter above the current max for pre-existing databases
   // (fresh databases start at 0, matching the old MAX(seq)+1-from-empty behavior).
   // OR IGNORE, not a `WHERE NOT EXISTS` guard on the SELECT: an aggregate query without GROUP BY

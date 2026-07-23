@@ -207,6 +207,26 @@ export class LifeSimulator {
         ts: at,
       }, [`private:${agentId}`, location ? `local:${location}` : 'global']);
     }
+    // Materialize what the NPC is doing in the shared environment, not only in its private
+    // life-state row. Other systems and the UI can now observe occupancy and recent interactions.
+    if (currentLocation && currentLocation !== location) {
+      this.environment.set(currentLocation, `presence.${agentId}`, false, { at });
+    }
+    if (location) {
+      const interaction = {
+        agentId,
+        action: action.type,
+        targetId: action.targetId ?? null,
+        reason: action.reason ?? null,
+        weather,
+        needs,
+      };
+      this.environment.set(location, `presence.${agentId}`, true, { at });
+      this.environment.set(location, `activity.${agentId}`, interaction, { at });
+      if (action.type === 'inspect' || action.type === 'work' || action.type === 'shelter') {
+        this.environment.set(location, `interaction.${action.type}.last`, interaction, { at });
+      }
+    }
     return { agentId, at, action: { ...action, location }, needs };
   }
 

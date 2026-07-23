@@ -84,6 +84,9 @@ test('agents follow schedules and needs decay as world hours pass', () => {
     assert.equal(f.store.getFact('alice', 'location').content, 'bridge');
     assert.ok(alice.needs.energy < 75);
     assert.ok(f.store.getRecentEvents().some((event) => event.type === 'life_action' && event.content === 'work'));
+    assert.equal(f.environment.get('bridge', 'presence.alice').value, true);
+    assert.equal(f.environment.get('bridge', 'activity.alice').value.action, 'work');
+    assert.equal(f.environment.get('bridge', 'interaction.work.last').value.agentId, 'alice');
   } finally {
     f.close();
   }

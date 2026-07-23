@@ -63,29 +63,46 @@ export class AutonomousSceneRunner {
     }, tags);
 
     const turns = [];
+    const failures = [];
+    let completedAttempts = 0;
     for (const agentId of agentIds) {
-      const result = await this.turnRunner.runTurn(agentId, {
-        llmClient,
-        utilityLlmClient,
-        resolveName: (id) => {
-          if (id === 'system') return '世界';
-          if (id === 'world-will' || id === 'world-will-agent') return '世界意志';
-          return this._name(id);
-        },
-        roster: names.filter((name) => name !== this._name(agentId)),
-        witnessIds: agentIds,
-        extraTags: ['system:autonomous'],
-        eventData: { autonomous: true, sceneId, location },
-        eventTs: worldTime,
-      });
-      if (!result.silent) turns.push({ agentId, dialogueText: result.dialogueText });
+      try {
+        const result = await this.turnRunner.runTurn(agentId, {
+          llmClient,
+          utilityLlmClient,
+          resolveName: (id) => {
+            if (id === 'system') return '世界';
+            if (id === 'world-will' || id === 'world-will-agent') return '世界意志';
+            return this._name(id);
+          },
+          roster: names.filter((name) => name !== this._name(agentId)),
+          witnessIds: agentIds,
+          extraTags: ['system:autonomous'],
+          eventData: { autonomous: true, sceneId, location },
+          eventTs: worldTime,
+        });
+        completedAttempts += 1;
+        if (!result.silent) turns.push({ agentId, dialogueText: result.dialogueText });
+      } catch (error) {
+        failures.push({ agentId, error: error.message });
+      }
+    }
+
+    if (completedAttempts === 0 && failures.length > 0) {
+      throw new AggregateError(
+        failures.map((item) => new Error(`${item.agentId}: ${item.error}`)),
+        `all ${failures.length} autonomous turns failed`,
+      );
     }
 
     this.store.append({
       type: 'autonomous_scene', actor: 'system', subject: location, key: 'completed',
       content: `${names.join('、')}的自主场景结束。`,
-      data: { autonomous: true, sceneId, location, participants: agentIds, turnCount: turns.length }, ts: worldTime,
+      data: {
+        autonomous: true, sceneId, location, participants: agentIds,
+        turnCount: turns.length, failures,
+      }, ts: worldTime,
     }, tags);
-    return { status: 'completed', sceneId, location, turns };
+    return { status: failures.length ? 'partial' : 'completed', sceneId, location, turns, failures };
   }
 }

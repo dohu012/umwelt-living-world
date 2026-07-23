@@ -67,8 +67,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs (
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'running', 'completed', 'failed')),
   created_at TEXT NOT NULL,
+  started_at TEXT,
   completed_at TEXT,
-  error TEXT
+  error TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  max_attempts INTEGER NOT NULL DEFAULT 3
 );
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_jobs_due

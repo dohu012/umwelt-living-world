@@ -63,6 +63,7 @@ export class WorldRegistry {
     const metadata = loadWorldMetadata(worldDir);
     const clock = new WorldClock(db);
     const queue = new JobQueue(db);
+    queue.recoverInterrupted();
     const decisions = new DecisionManager(db);
     const environment = new EnvironmentStore(db);
     const worldNow = () => new Date(clock.getState().worldTime);

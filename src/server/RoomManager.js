@@ -303,6 +303,11 @@ export class RoomManager {
     return next;
   }
 
+  /** Shares the interactive turn lock with background simulation for this world. */
+  runExclusive(worldId, job) {
+    return this._enqueue(worldId, job);
+  }
+
   /**
    * `location`/`personaId` are deliberately re-read from `ws.umweltRoom` *inside* the queued job,
    * not captured from the caller up front: `scene_done` broadcasts before this same message's own

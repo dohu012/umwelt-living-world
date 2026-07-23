@@ -12,7 +12,9 @@ export function startServer({ projectRoot, dataDir, nimConfig, summarizeEveryNTu
   });
   const server = http.createServer(app);
   attachWebSocketServer(server, { worldRegistry, roomManager });
-  const worldWorker = new WorldWorker(worldRegistry);
+  const worldWorker = new WorldWorker(worldRegistry, {
+    runWorld: (worldId, job) => roomManager.runExclusive(worldId, job),
+  });
   worldWorker.start();
 
   server.listen(port, host, () => {

@@ -144,3 +144,101 @@ test('autonomous scene safely skips when no dialogue provider is enabled', async
     assert.deepEqual(result, { status: 'skipped', reason: 'no_dialogue_provider' });
   } finally { f.close(); }
 });
+
+test('a failed autonomous scene is retried durably and releases its cooldown after exhaustion', async () => {
+  const f = fixture();
+  try {
+    let worldTime = '2026-07-22T01:00:00.000Z';
+    const released = [];
+    const job = f.queue.schedule({
+      runAt: worldTime,
+      type: 'autonomous_scene',
+      subject: 'bridge',
+      payload: { location: 'bridge', triggeredAt: worldTime, participants: [] },
+      maxAttempts: 2,
+    });
+    const { WorldEngine } = await import('../src/simulation/WorldEngine.js');
+    const engine = new WorldEngine({
+      clock: { synchronize: () => ({ worldTime }) },
+      queue: f.queue,
+      worldEvents: {},
+      autonomousScenes: { run: async () => { throw new Error('temporary provider outage'); } },
+      sceneScheduler: { scheduleFromLife: () => [], release: (...args) => released.push(args) },
+      sceneRetryMinutes: 5,
+    });
+
+    const first = await engine.tick();
+    assert.equal(first.results[0].retrying, true);
+    assert.equal(f.queue.get(job.id).status, 'pending');
+    assert.equal(f.queue.get(job.id).attempts, 1);
+
+    worldTime = '2026-07-22T01:05:00.000Z';
+    const second = await engine.tick();
+    assert.equal(second.results[0].retrying, false);
+    assert.equal(f.queue.get(job.id).status, 'failed');
+    assert.equal(f.queue.get(job.id).attempts, 2);
+    assert.deepEqual(released, [['bridge', '2026-07-22T01:00:00.000Z']]);
+  } finally { f.close(); }
+});
+
+test('interrupted running jobs are recovered when a world is reopened', () => {
+  const f = fixture();
+  try {
+    const job = f.queue.schedule({
+      runAt: '2026-07-22T01:00:00.000Z', type: 'autonomous_scene', maxAttempts: 3,
+    });
+    assert.equal(f.queue.markRunning(job.id), true);
+    assert.equal(f.queue.get(job.id).status, 'running');
+    assert.equal(f.queue.recoverInterrupted(), 1);
+    assert.equal(f.queue.get(job.id).status, 'pending');
+    assert.equal(f.queue.get(job.id).attempts, 1);
+  } finally { f.close(); }
+});
+
+test('legacy autonomous failures receive the new retry policy after upgrade', () => {
+  const f = fixture();
+  try {
+    const job = f.queue.schedule({
+      runAt: '2026-07-22T01:00:00.000Z', type: 'autonomous_scene', maxAttempts: 3,
+    });
+    assert.equal(f.queue.markRunning(job.id), true);
+    f.queue.fail(job.id, new Error('fetch failed'));
+    assert.equal(f.queue.get(job.id).status, 'failed');
+    assert.equal(f.queue.recoverInterrupted(), 1);
+    assert.equal(f.queue.get(job.id).status, 'pending');
+    assert.equal(f.queue.get(job.id).attempts, 1);
+  } finally { f.close(); }
+});
+
+test('one failed NPC turn does not prevent the other NPCs from completing the scene', async () => {
+  const f = fixture();
+  try {
+    for (const id of ['alice', 'bob', 'carol']) {
+      f.store.append({ type: 'state', actor: 'system', subject: id, key: 'location', content: 'bridge' });
+    }
+    const called = [];
+    const runner = new AutonomousSceneRunner({
+      store: f.store,
+      agentRegistry: { loadProfile: (id) => ({ name: id }) },
+      locationRegistry: { get: () => ({ name: 'Bridge' }) },
+      worldDir: f.dir,
+      providerSettingsStore: { getActiveForKind: () => ({ model: 'fake' }) },
+      createClient: () => ({}),
+      turnRunner: {
+        async runTurn(agentId) {
+          called.push(agentId);
+          if (agentId === 'alice') throw new Error('bad response');
+          return { dialogueText: `${agentId} speaks`, silent: false };
+        },
+      },
+    });
+    const result = await runner.run({
+      location: 'bridge',
+      participants: ['alice', 'bob', 'carol'].map((agentId) => ({ agentId, action: 'work' })),
+    }, '2026-07-22T01:00:00.000Z');
+    assert.equal(result.status, 'partial');
+    assert.deepEqual(called, ['alice', 'bob', 'carol']);
+    assert.deepEqual(result.turns.map((turn) => turn.agentId), ['bob', 'carol']);
+    assert.equal(result.failures[0].agentId, 'alice');
+  } finally { f.close(); }
+});

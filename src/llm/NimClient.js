@@ -1,7 +1,10 @@
 import { createSSEParser } from './sseParse.js';
 
 export class NimClient {
-  constructor({ baseUrl, model, apiKey, temperature = 0.8, maxTokens = 300, reasoningEffort = null, extraBody = null }) {
+  constructor({
+    baseUrl, model, apiKey, temperature = 0.8, maxTokens = 300, reasoningEffort = null,
+    extraBody = null, requestTimeoutMs = 60_000,
+  }) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.model = model;
     this.apiKey = apiKey;
@@ -12,6 +15,7 @@ export class NimClient {
     // { chat_template_kwargs: { enable_thinking: false } } or it burns max_tokens on thinking
     // and never emits content — kept generic rather than special-cased per model family.
     this.extraBody = extraBody;
+    this.requestTimeoutMs = Math.max(1_000, Number(requestTimeoutMs) || 60_000);
   }
 
   /**
@@ -43,6 +47,7 @@ export class NimClient {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.requestTimeoutMs),
       });
     } catch (error) {
       const reason = error?.cause?.message ?? error?.message ?? String(error);

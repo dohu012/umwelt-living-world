@@ -23,6 +23,12 @@ export class AutonomousSceneScheduler {
     `).run(this._stateKey(location), at, at);
   }
 
+  release(location, at) {
+    if (!location) return;
+    this.db.prepare('DELETE FROM simulation_state WHERE key = ? AND value = ?')
+      .run(this._stateKey(location), at);
+  }
+
   scheduleFromLife(life, worldTime) {
     if (!life?.actions?.length) return [];
     const fallbackAt = new Date(worldTime).toISOString();

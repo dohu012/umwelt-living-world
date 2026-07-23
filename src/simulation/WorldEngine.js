@@ -1,11 +1,15 @@
 export class WorldEngine {
-  constructor({ clock, queue, worldEvents, lifeSimulator = null, autonomousScenes = null, sceneScheduler = null }) {
+  constructor({
+    clock, queue, worldEvents, lifeSimulator = null, autonomousScenes = null, sceneScheduler = null,
+    sceneRetryMinutes = 5,
+  }) {
     this.clock = clock;
     this.queue = queue;
     this.worldEvents = worldEvents;
     this.lifeSimulator = lifeSimulator;
     this.autonomousScenes = autonomousScenes;
     this.sceneScheduler = sceneScheduler;
+    this.sceneRetryMs = Math.max(1, Number(sceneRetryMinutes) || 5) * 60 * 1000;
   }
 
   async tick({ limit = 100 } = {}) {
@@ -39,10 +43,28 @@ export class WorldEngine {
           throw new Error(`no handler for job type "${job.type}"`);
         }
         this.queue.complete(job.id);
+        if (job.type === 'autonomous_scene' && ['skipped', 'partial'].includes(result?.status)) {
+          this.sceneScheduler?.release(job.payload?.location, job.payload?.triggeredAt);
+        }
         results.push({ jobId: job.id, ok: true, result });
       } catch (error) {
-        this.queue.fail(job.id, error);
-        results.push({ jobId: job.id, ok: false, error: error.message });
+        const retryAt = new Date(new Date(worldTime).getTime() + this.sceneRetryMs).toISOString();
+        const retrying = job.type === 'autonomous_scene'
+          && typeof this.queue.retry === 'function'
+          && this.queue.retry(job.id, { runAt: retryAt, error });
+        if (!retrying) {
+          this.queue.fail(job.id, error);
+          if (job.type === 'autonomous_scene') {
+            this.sceneScheduler?.release(job.payload?.location, job.payload?.triggeredAt);
+          }
+        }
+        results.push({
+          jobId: job.id,
+          ok: false,
+          retrying,
+          ...(retrying ? { retryAt } : {}),
+          error: error.message,
+        });
       }
     }
     return results;
